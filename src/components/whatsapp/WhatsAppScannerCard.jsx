@@ -340,15 +340,15 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
            ========================================================================= */}
         <div className="wa-timer-config-card" style={{
           marginTop: '18px',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
+          background: '#f0f7ff',
+          border: '1px solid #bae0ff',
           borderRadius: '10px',
           padding: '16px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#dbeafe', color: '#1d4ed8', display: 'grid', placeItems: 'center', fontWeight: '700', fontSize: '14px' }}>
-                ⏱️
+              <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#0ea5e9', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: '700', fontSize: '14px' }}>
+                ⏱
               </div>
               <div>
                 <h4 style={{ margin: 0, fontSize: '13.5px', color: '#0f172a', fontWeight: '700' }}>
@@ -364,29 +364,29 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
               <button
                 type="button"
                 className="btn btn-outline"
-                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#fff' }}
+                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#fff', borderColor: '#7dd3fc', color: '#0284c7' }}
                 onClick={() => handleApplyPreset(1, 2)}
                 title="Fast delivery speed"
               >
-                ⚡ Fast (1s/2s)
+                Fast (1s/2s)
               </button>
               <button
                 type="button"
                 className="btn btn-outline"
-                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#fff', borderColor: '#86efac', color: '#15803d' }}
+                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#fff', borderColor: '#38bdf8', color: '#0369a1' }}
                 onClick={() => handleApplyPreset(2, 3)}
                 title="Recommended anti-ban timing"
               >
-                🛡️ Safe (2s/3s)
+                Safe (2s/3s)
               </button>
               <button
                 type="button"
                 className="btn btn-outline"
-                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#fff' }}
+                style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '6px', background: '#fff', borderColor: '#0ea5e9', color: '#0369a1' }}
                 onClick={() => handleApplyPreset(3, 5)}
                 title="Extra safe for large lists"
               >
-                🔒 Strict (3s/5s)
+                Strict (3s/5s)
               </button>
             </div>
           </div>
@@ -399,9 +399,9 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
               marginBottom: '14px'
             }}>
               {/* First Message Timer */}
-              <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
-                  🚀 First Message Start Delay (Seconds)
+              <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #bae0ff' }}>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#0369a1', marginBottom: '4px' }}>
+                  First Message Start Delay (Seconds)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
@@ -422,9 +422,9 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
               </div>
 
               {/* Per-Message Interval */}
-              <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
-                  ⏳ Delay Between Messages (Per Message)
+              <div style={{ background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #bae0ff' }}>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '700', color: '#0369a1', marginBottom: '4px' }}>
+                  Delay Between Messages (Per Message)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input
@@ -447,29 +447,29 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
 
             {/* Live 100 Contacts Simulator Breakdown */}
             <div style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              background: '#e0f2fe',
+              border: '1px solid #7dd3fc',
               borderRadius: '8px',
               padding: '12px 14px',
               marginBottom: '14px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                 <div>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                    📊 100 Contacts Delivery Estimation:
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    100 Contacts Delivery Estimation:
                   </span>
-                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#15803d', marginTop: '2px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7', marginTop: '2px' }}>
                     100 Messages Total Time: ~{formatSeconds(totalSimulatedSec)}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#166534', marginTop: '2px' }}>
+                  <div style={{ fontSize: '11px', color: '#0369a1', marginTop: '2px' }}>
                     Breakdown: 1st msg in <strong>{numInitial}s</strong> + remaining 99 msgs × <strong>{numInterval}s</strong> = <strong>{totalSimulatedSec} seconds</strong>.
                   </div>
                 </div>
 
                 <div style={{
-                  background: numInterval >= 3 ? '#dcfce7' : '#fef9c3',
-                  border: `1px solid ${numInterval >= 3 ? '#86efac' : '#fde047'}`,
-                  color: numInterval >= 3 ? '#166534' : '#854d0e',
+                  background: numInterval >= 3 ? '#0ea5e9' : '#38bdf8',
+                  border: `1px solid ${numInterval >= 3 ? '#0284c7' : '#7dd3fc'}`,
+                  color: '#fff',
                   padding: '4px 10px',
                   borderRadius: '20px',
                   fontSize: '11px',
@@ -478,7 +478,7 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
                   alignItems: 'center',
                   gap: '4px'
                 }}>
-                  {numInterval >= 3 ? '🟢 Anti-Ban Safe' : '⚠️ Fast Speed'}
+                  {numInterval >= 3 ? 'Anti-Ban Safe' : 'Fast Speed'}
                 </div>
               </div>
             </div>
@@ -488,14 +488,14 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
               <button
                 type="submit"
                 className="btn btn-primary"
-                style={{ fontSize: '12.5px', padding: '7px 16px', background: '#059669', borderColor: '#059669', borderRadius: '8px', color: '#ffffff', fontWeight: 600 }}
+                style={{ fontSize: '12.5px', padding: '7px 16px', background: '#0ea5e9', borderColor: '#0284c7', borderRadius: '8px', color: '#ffffff', fontWeight: 600 }}
               >
-                💾 Save Timing Settings
+                Save Timing Settings
               </button>
 
               {timerSaved && (
-                <span style={{ fontSize: '11.5px', color: '#15803d', fontWeight: '700' }}>
-                  ✅ Timing configuration saved!
+                <span style={{ fontSize: '11.5px', color: '#0284c7', fontWeight: '700' }}>
+                  Timing configuration saved!
                 </span>
               )}
             </div>
