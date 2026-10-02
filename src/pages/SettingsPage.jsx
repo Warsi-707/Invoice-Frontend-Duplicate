@@ -6,6 +6,7 @@ import ProposalPreviewModal from '../components/proposal/ProposalPreviewModal';
 import { downloadProposalFile } from '../utils/proposal';
 import { generateInvoiceHtml } from '../utils/invoice';
 import { money, today, cleanPhoneInput } from '../utils/formatters';
+import { DEFAULT_SERVICES } from '../utils/storage';
 
 const PRESET_TERMS = {
   preset1: `1. Validity: This commercial quotation is valid for 14 calendar days from the date of issuance.
@@ -42,7 +43,20 @@ export default function SettingsPage() {
   } = useApp();
 
   const fileInputRef = useRef(null);
-  const activeTab = settingsTab === 'proposal' ? 'proposal' : settingsTab === 'invoice' ? 'invoice' : 'org';
+  const activeTab = settingsTab === 'proposal' ? 'proposal' : settingsTab === 'invoice' ? 'invoice' : settingsTab === 'services' ? 'services' : 'org';
+
+  // Services Catalog State
+  const [servicesList, setServicesList] = useState(
+    Array.isArray(state.settings?.services) && state.settings.services.length > 0
+      ? state.settings.services
+      : DEFAULT_SERVICES
+  );
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServiceCategory, setNewServiceCategory] = useState('');
+  const [newServicePrice, setNewServicePrice] = useState('');
+  const [newServiceUnit, setNewServiceUnit] = useState('Project');
+  const [newServiceDesc, setNewServiceDesc] = useState('');
+  const [serviceSearch, setServiceSearch] = useState('');
 
   // Tab 01: Organization Identity State
   const [adminUser, setAdminUser] = useState(state.settings?.admin || 'Administrator');
@@ -159,6 +173,10 @@ export default function SettingsPage() {
       if (p.accountIban !== undefined) setAccountIban(p.accountIban);
       if (p.invoicePrefix !== undefined) setInvoicePrefix(p.invoicePrefix);
     }
+
+    if (state.settings?.services && Array.isArray(state.settings.services)) {
+      setServicesList(state.settings.services);
+    }
   }, [state.settings]);
 
   // Master Save Function
@@ -190,11 +208,85 @@ export default function SettingsPage() {
       dueDays: Math.max(0, Number(dueDays || 0)),
       footerNote: footerNote.trim(),
       proposalData: proposalDataPayload,
-      whatsappSettings: state.settings?.whatsappSettings || { initialDelay: 2, messageDelay: 3 }
+      whatsappSettings: state.settings?.whatsappSettings || { initialDelay: 2, messageDelay: 3 },
+      services: servicesList
     });
 
     showToast('✅ Settings saved successfully.');
   };
+
+  // Service Catalog Actions
+  const handleAddService = (e) => {
+    e?.preventDefault();
+    if (!newServiceName.trim()) {
+      showToast('⚠️ Please enter service name / title.');
+      return;
+    }
+
+    const newServiceObj = {
+      id: `srv-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name: newServiceName.trim(),
+      category: newServiceCategory.trim() || 'General Service',
+      price: newServicePrice !== '' ? Number(newServicePrice) : 0,
+      unit: newServiceUnit.trim() || 'Project',
+      desc: newServiceDesc.trim()
+    };
+
+    const updated = [newServiceObj, ...servicesList];
+    setServicesList(updated);
+    setNewServiceName('');
+    setNewServiceCategory('');
+    setNewServicePrice('');
+    setNewServiceDesc('');
+
+    updateSettings({
+      ...state.settings,
+      services: updated
+    });
+
+    showToast(`✅ Service "${newServiceObj.name}" added to catalog.`);
+  };
+
+  const handleUpdateService = (index, field, value) => {
+    const updated = [...servicesList];
+    updated[index] = { ...updated[index], [field]: value };
+    setServicesList(updated);
+  };
+
+  const handleDeleteService = (index) => {
+    const srv = servicesList[index];
+    if (confirm(`Remove service "${srv?.name || 'Service'}" from catalog?`)) {
+      const updated = servicesList.filter((_, idx) => idx !== index);
+      setServicesList(updated);
+      updateSettings({
+        ...state.settings,
+        services: updated
+      });
+      showToast('🗑️ Service removed from catalog.');
+    }
+  };
+
+  const handleResetDefaultServices = () => {
+    if (confirm('Restore standard default services catalog?')) {
+      setServicesList(DEFAULT_SERVICES);
+      updateSettings({
+        ...state.settings,
+        services: DEFAULT_SERVICES
+      });
+      showToast('✅ Restored default services catalog.');
+    }
+  };
+
+  // Filtered services for search
+  const filteredServices = useMemo(() => {
+    if (!serviceSearch.trim()) return servicesList;
+    const query = serviceSearch.toLowerCase().trim();
+    return servicesList.filter(s =>
+      (s.name && s.name.toLowerCase().includes(query)) ||
+      (s.category && s.category.toLowerCase().includes(query)) ||
+      (s.desc && s.desc.toLowerCase().includes(query))
+    );
+  }, [servicesList, serviceSearch]);
 
   // Proposal Item Handlers
   const handleAddItem = () => {
@@ -294,8 +386,41 @@ export default function SettingsPage() {
 
   return (
     <section id="settings" className="page active">
+      {/* Settings Module Navigation Segmented Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        {[
+          { id: 'org', label: 'Organization & Admin' },
+          { id: 'proposal', label: 'Proposal & Letterhead' },
+          { id: 'invoice', label: 'Invoice Settings' },
+          { id: 'services', label: 'Services Catalog' }
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setSettingsTab(tab.id)}
+              style={{
+                padding: '6px 16px',
+                fontSize: '12.5px',
+                fontWeight: isActive ? '700' : '500',
+                borderRadius: '20px',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                border: isActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                background: isActive ? '#f0f9ff' : '#ffffff',
+                color: isActive ? '#0284c7' : '#475569',
+                boxShadow: 'none'
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Dynamic Header for Selected Module */}
-      <div className="settings-header-top" style={{ marginBottom: '24px' }}>
+      <div className="settings-header-top" style={{ marginBottom: '20px' }}>
         <div className="settings-header-title" style={{ width: '100%' }}>
           {activeTab === 'org' && (
             <>
@@ -319,7 +444,7 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <h2>
-                  <span>Invoice Settings & Live Template Preview</span>
+                  <span>Invoice Settings &amp; Live Template Preview</span>
                 </h2>
                 <p>Configure default billing currency, payment due days, invoice prefix, footer terms, and banking credentials.</p>
               </div>
@@ -337,6 +462,33 @@ export default function SettingsPage() {
                   onClick={handleSaveAllSettings}
                 >
                   Save Invoice Settings
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'services' && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2>
+                  <span>Services &amp; Pricing Catalog</span>
+                </h2>
+                <p>Manage standard services, default deliverable rates, and scope descriptions for 1-click selection in Proposal &amp; Invoice builder.</p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Button
+                  variant="light"
+                  size="sm"
+                  onClick={handleResetDefaultServices}
+                >
+                  Restore Standard Defaults
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveAllSettings}
+                >
+                  Save Services Catalog
                 </Button>
               </div>
             </div>
@@ -924,7 +1076,8 @@ export default function SettingsPage() {
               <div
                 style={{
                   background: '#ffffff',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                  boxShadow: 'none',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '8px',
                   width: '750px',
                   maxWidth: '100%',
@@ -937,6 +1090,270 @@ export default function SettingsPage() {
         )}
       </div>
     )}
+
+      {/* =========================================================================
+          MODULE 04: Services Catalog & Pricing Configuration
+         ========================================================================= */}
+      {activeTab === 'services' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Section 1: Add New Service Form Card */}
+          <div className="settings-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0b4b8f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                  </svg>
+                  <span>Add New Service to Catalog</span>
+                </h4>
+                <div className="settings-data-note" style={{ marginTop: '2px' }}>
+                  Define standard service rates, billing units, and scope descriptions for quick 1-click selection in Proposals &amp; Invoices.
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddService} className="settings-form-grid enter-flow" autoComplete="off">
+              <div>
+                <label>
+                  Service Title / Name <span className="req">*</span>
+                </label>
+                <input
+                  className="input"
+                  placeholder="e.g. E-Commerce Website Development"
+                  value={newServiceName}
+                  onChange={(e) => setNewServiceName(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label>Service Category</label>
+                <input
+                  className="input"
+                  placeholder="e.g. Web Development / Software / SEO / Design"
+                  value={newServiceCategory}
+                  onChange={(e) => setNewServiceCategory(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label>Default Unit Price ({currency})</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  placeholder="0"
+                  value={newServicePrice}
+                  onChange={(e) => setNewServicePrice(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label>Billing Unit / Frequency</label>
+                <select
+                  className="select"
+                  value={newServiceUnit}
+                  onChange={(e) => setNewServiceUnit(e.target.value)}
+                >
+                  <option value="Project">Per Project</option>
+                  <option value="Month">Per Month</option>
+                  <option value="Hour">Per Hour</option>
+                  <option value="Milestone">Per Milestone</option>
+                  <option value="Item">Per Item / Unit</option>
+                  <option value="One-time">One-time Fee</option>
+                </select>
+              </div>
+
+              <div className="full">
+                <label>Deliverable Scope / Default Description (Optional)</label>
+                <textarea
+                  className="textarea"
+                  rows={2}
+                  placeholder="e.g. Complete custom responsive web application with responsive UI, payment gateway, and administrative dashboard."
+                  value={newServiceDesc}
+                  onChange={(e) => setNewServiceDesc(e.target.value)}
+                  style={{ fontSize: '12px' }}
+                />
+              </div>
+
+              <div className="full" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
+                <Button variant="primary" type="submit">
+                  + Add Service to Catalog
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* Section 2: Configured Services Table & Management */}
+          <div className="settings-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>Configured Services Catalog</span>
+                  <span style={{
+                    background: '#e0f2fe',
+                    color: '#0369a1',
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: '700'
+                  }}>
+                    {filteredServices.length} {filteredServices.length === 1 ? 'Service' : 'Services'}
+                  </span>
+                </h4>
+                <div className="settings-data-note" style={{ marginTop: '2px' }}>
+                  These services will appear in dropdowns across Commercial Proposal Builder and Invoice Generator.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  className="input"
+                  placeholder="🔍 Search services..."
+                  value={serviceSearch}
+                  onChange={(e) => setServiceSearch(e.target.value)}
+                  style={{ height: '32px', width: '200px', fontSize: '12px' }}
+                />
+                <Button variant="light" size="sm" onClick={handleResetDefaultServices}>
+                  Reset Defaults
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleSaveAllSettings}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+
+            {filteredServices.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '36px 16px',
+                background: '#f8fafc',
+                borderRadius: '8px',
+                border: '1px dashed #cbd5e1'
+              }}>
+                <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 10px' }}>
+                  {serviceSearch ? 'No services matched your search query.' : 'No services in catalog yet.'}
+                </p>
+                <Button variant="light" size="sm" onClick={handleResetDefaultServices}>
+                  Load Recommended Default Services
+                </Button>
+              </div>
+            ) : (
+              <div className="table-wrap" style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
+                      <th style={{ width: '36px', textAlign: 'center', padding: '10px 8px', fontSize: '11px' }}>#</th>
+                      <th style={{ width: '28%', textAlign: 'left', padding: '10px 8px', fontSize: '11px' }}>Service Name</th>
+                      <th style={{ width: '18%', textAlign: 'left', padding: '10px 8px', fontSize: '11px' }}>Category</th>
+                      <th style={{ width: '15%', textAlign: 'right', padding: '10px 8px', fontSize: '11px' }}>Default Price ({currency})</th>
+                      <th style={{ width: '12%', textAlign: 'center', padding: '10px 8px', fontSize: '11px' }}>Billing Unit</th>
+                      <th style={{ textAlign: 'left', padding: '10px 8px', fontSize: '11px' }}>Default Scope / Description</th>
+                      <th style={{ width: '45px', textAlign: 'center', padding: '10px 8px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredServices.map((srv, idx) => {
+                      const originalIdx = servicesList.findIndex(s => s.id === srv.id);
+                      const targetIdx = originalIdx >= 0 ? originalIdx : idx;
+
+                      return (
+                        <tr key={srv.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ textAlign: 'center', color: '#64748b', fontSize: '11px', padding: '8px' }}>
+                            {idx + 1}
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="input"
+                              value={srv.name || ''}
+                              placeholder="Service title"
+                              onChange={(e) => handleUpdateService(targetIdx, 'name', e.target.value)}
+                              style={{ height: '30px', fontSize: '12px', fontWeight: '600' }}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="input"
+                              value={srv.category || ''}
+                              placeholder="Category"
+                              onChange={(e) => handleUpdateService(targetIdx, 'category', e.target.value)}
+                              style={{ height: '30px', fontSize: '12px' }}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              className="input"
+                              value={srv.price !== undefined ? srv.price : ''}
+                              placeholder="0"
+                              onChange={(e) => handleUpdateService(targetIdx, 'price', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                              style={{ height: '30px', fontSize: '12px', textAlign: 'right', fontWeight: '700' }}
+                            />
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <select
+                              className="select"
+                              value={srv.unit || 'Project'}
+                              onChange={(e) => handleUpdateService(targetIdx, 'unit', e.target.value)}
+                              style={{ height: '30px', fontSize: '11.5px', padding: '2px 6px' }}
+                            >
+                              <option value="Project">Project</option>
+                              <option value="Month">Month</option>
+                              <option value="Hour">Hour</option>
+                              <option value="Milestone">Milestone</option>
+                              <option value="Item">Item</option>
+                              <option value="One-time">One-time</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '6px 8px' }}>
+                            <input
+                              className="input"
+                              value={srv.desc || ''}
+                              placeholder="Default scope or feature description"
+                              onChange={(e) => handleUpdateService(targetIdx, 'desc', e.target.value)}
+                              style={{ height: '30px', fontSize: '11.5px' }}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '6px 8px' }}>
+                            <button
+                              type="button"
+                              className="action-icon-btn delete"
+                              title="Delete Service"
+                              onClick={() => handleDeleteService(targetIdx)}
+                              style={{ width: '28px', height: '28px' }}
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                💡 <strong>Tip:</strong> In the Proposal Builder or Invoice Generator, select any service from the dropdown to automatically fill the service description and default pricing.
+              </div>
+              <div>
+                <Button variant="primary" onClick={handleSaveAllSettings}>
+                  Save Services Catalog
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Live A4 Proposal Preview Modal */}
       <ProposalPreviewModal

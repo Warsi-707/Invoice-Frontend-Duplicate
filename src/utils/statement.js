@@ -63,7 +63,7 @@ export function generateStatementHtml(customer = {}, business = {}, invoices = [
   <meta charset="utf-8">
   <title>Account Statement - ${esc(customer.name || 'Client')}</title>
   <style>
-    @page { margin: 8mm; size: A4 portrait; }
+    @page { margin: 0; }
     * { box-sizing: border-box; }
     html, body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; background: #ffffff !important; padding: 0 !important; margin: 0 !important; color: #172033; }
     .statement { width: 750px !important; max-width: 750px !important; margin: 0 !important; padding: 24px 28px !important; background: #ffffff !important; border: 1.5px solid #cbd5e1 !important; border-radius: 10px !important; box-sizing: border-box !important; position: relative; }

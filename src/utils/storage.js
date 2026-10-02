@@ -1,5 +1,14 @@
 const STORAGE_KEY = 'mb_invoice_prototype_v8';
 
+export const DEFAULT_SERVICES = [
+  { id: 'srv-1', name: 'Website Design & Development', category: 'Web Development', price: 0, unit: 'Project', desc: 'Custom responsive website with modern UI/UX and full mobile optimization.' },
+  { id: 'srv-2', name: 'Custom Web Application & ERP', category: 'Software', price: 0, unit: 'Project', desc: 'Full-stack software development with database, authentication and reporting.' },
+  { id: 'srv-3', name: 'Monthly Cloud Server & Maintenance', category: 'Maintenance', price: 0, unit: 'Month', desc: '24/7 server monitoring, performance optimization, and regular backups.' },
+  { id: 'srv-4', name: 'UI / UX Design & Prototyping', category: 'Design', price: 0, unit: 'Project', desc: 'Figma wireframes, design system, interactive prototypes and visual assets.' },
+  { id: 'srv-5', name: 'WhatsApp Automation & Billing API', category: 'Automation', price: 0, unit: 'Service', desc: 'Automated WhatsApp invoice dispatch, notifications and instant alerts.' },
+  { id: 'srv-6', name: 'Search Engine Optimization (SEO)', category: 'Marketing', price: 0, unit: 'Month', desc: 'On-page SEO, keyword targeting, Google business ranking & speed optimization.' }
+];
+
 export const DEFAULT_STATE = {
   session: {
     isAuthenticated: false,
@@ -14,7 +23,8 @@ export const DEFAULT_STATE = {
     whatsappSettings: {
       initialDelay: 2,
       messageDelay: 3
-    }
+    },
+    services: DEFAULT_SERVICES
   },
   businesses: [],
   customers: [],
@@ -42,7 +52,10 @@ export function loadStoredState() {
         dueDays: parsed.settings?.dueDays ?? 0,
         footerNote: parsed.settings?.footerNote ?? 'Thank you for your business.',
         proposalData: parsed.settings?.proposalData || {},
-        whatsappSettings: parsed.settings?.whatsappSettings || { initialDelay: 2, messageDelay: 3 }
+        whatsappSettings: parsed.settings?.whatsappSettings || { initialDelay: 2, messageDelay: 3 },
+        services: Array.isArray(parsed.settings?.services) && parsed.settings.services.length > 0
+          ? parsed.settings.services
+          : DEFAULT_SERVICES
       },
       businesses: Array.isArray(parsed.businesses) ? parsed.businesses : [],
       customers: Array.isArray(parsed.customers) ? parsed.customers : [],

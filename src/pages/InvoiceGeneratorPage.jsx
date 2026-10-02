@@ -5,6 +5,7 @@ import InvoicePreview from '../components/invoice/InvoicePreview';
 import Button from '../components/common/Button';
 import { MONTHS, YEARS, today, money } from '../utils/formatters';
 import { nextInvoiceNo, calculateInvoiceTotals, getNextInvoiceMonth, downloadInvoiceFile, generateInvoiceHtml } from '../utils/invoice';
+import { getMilestoneLiveMetrics } from '../utils/milestone';
 import { downloadAndSendWhatsApp } from '../utils/whatsappPdf';
 import { whatsappApi } from '../services/api';
 
@@ -23,6 +24,8 @@ export default function InvoiceGeneratorPage() {
   const [includePreviousDues, setIncludePreviousDues] = useState(false);
 
   const [items, setItems] = useState([]);
+  const [selectedMilestoneId, setSelectedMilestoneId] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
 
   // Preview Modal State
   const [previewData, setPreviewData] = useState(null);
@@ -79,6 +82,15 @@ export default function InvoiceGeneratorPage() {
               id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
             }))
           );
+          // If subscription item exists, pre-set due date and billing month/year
+          const subItem = cust.items.find((it) => it.billingType === 'subscription' && it.nextDueDate);
+          if (subItem) {
+            setDueDate(subItem.nextDueDate);
+            const [dueY, dueM] = subItem.nextDueDate.split('-');
+            const monthIdx = parseInt(dueM, 10) - 1;
+            if (MONTHS[monthIdx]) setMonth(MONTHS[monthIdx]);
+            if (dueY) setYear(dueY);
+          }
         } else {
           setItems([{ id: `item-${Date.now()}`, name: '', qty: 1, price: '', amount: 0 }]);
         }
@@ -100,6 +112,50 @@ export default function InvoiceGeneratorPage() {
   const effectivePreviousDues = includePreviousDues && previousDuesAmount > 0 ? previousDuesAmount : 0;
   const finalGrandTotal = totals.subtotal + effectivePreviousDues;
 
+  const clientMilestoneProjects = (selectedCustomer?.items || []).filter(
+    (it) => it.billingType === 'project' && it.projectBillingMode === 'milestone' && Array.isArray(it.milestones) && it.milestones.length > 0
+  );
+
+  const handleSelectMilestoneToInvoice = (project, milestone) => {
+    setSelectedMilestoneId(milestone.id);
+    setSelectedProjectId(project.id);
+    setItems([
+      {
+        id: `item-${Date.now()}`,
+        name: `${project.name} - Milestone: ${milestone.name}`,
+        qty: 1,
+        price: Number(milestone.amount || 0),
+        amount: Number(milestone.amount || 0),
+        billingType: 'project',
+        projectBillingMode: 'milestone',
+        milestoneId: milestone.id,
+        projectId: project.id
+      }
+    ]);
+    if (milestone.dueDate) {
+      setDueDate(milestone.dueDate);
+      const [dueY, dueM] = milestone.dueDate.split('-');
+      const mIdx = parseInt(dueM, 10) - 1;
+      if (MONTHS[mIdx]) setMonth(MONTHS[mIdx]);
+      if (dueY) setYear(dueY);
+    }
+  };
+
+  const handleClearMilestoneSelection = () => {
+    setSelectedMilestoneId(null);
+    setSelectedProjectId(null);
+    if (selectedCustomer?.items && selectedCustomer.items.length > 0) {
+      setItems(
+        selectedCustomer.items.map((item) => ({
+          ...item,
+          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+        }))
+      );
+    } else {
+      setItems([{ id: `item-${Date.now()}`, name: '', qty: 1, price: '', amount: 0 }]);
+    }
+  };
+
   const resetForm = () => {
     setBusinessId('');
     setCustomerId('');
@@ -109,6 +165,8 @@ export default function InvoiceGeneratorPage() {
     setDueDate(today());
     setItems([]);
     setIncludePreviousDues(false);
+    setSelectedMilestoneId(null);
+    setSelectedProjectId(null);
   };
 
   const validateForm = () => {
@@ -176,7 +234,9 @@ export default function InvoiceGeneratorPage() {
       paid: 0,
       balance: totals.total || totals.subtotal,
       status: 'Unpaid',
-      notes: state.settings?.footerNote || ''
+      notes: state.settings?.footerNote || '',
+      milestoneId: selectedMilestoneId || null,
+      projectId: selectedProjectId || null
     };
 
     setPreviewData(invoiceData);
@@ -202,16 +262,22 @@ export default function InvoiceGeneratorPage() {
       taxPct: 0,
       taxAmount: 0,
       total: totals.total || totals.subtotal,
-      notes: state.settings?.footerNote || ''
+      notes: state.settings?.footerNote || '',
+      milestoneId: selectedMilestoneId || null,
+      projectId: selectedProjectId || null
     };
 
     const result = createInvoice(invoicePayload);
 
     if (result.duplicate) {
-      alert(`This client's ${month} ${year} invoice already exists. Next month selected automatically.`);
-      const next = getNextInvoiceMonth(month, year);
-      setMonth(next.month);
-      setYear(next.year);
+      if (selectedMilestoneId) {
+        alert(result.message || 'Invoice already generated for this milestone.');
+      } else {
+        alert(`This client's ${month} ${year} invoice already exists. Next month selected automatically.`);
+        const next = getNextInvoiceMonth(month, year);
+        setMonth(next.month);
+        setYear(next.year);
+      }
       return;
     }
 
@@ -242,14 +308,23 @@ export default function InvoiceGeneratorPage() {
   return (
     <section id="generator" className="page active">
       <div className="panel generator-panel">
-        <div className="panel-head">
-          <span>Invoice Generator</span>
-          <span>{currentInvoiceNoText}</span>
+        <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>Invoice Generator</span>
+            <span style={{ fontSize: '11px', color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+              Create New Invoice
+            </span>
+          </div>
+          <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', background: '#f8fafc', padding: '4px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+            {currentInvoiceNoText}
+          </span>
         </div>
         <div className="panel-body enter-flow" id="genForm">
           {/* Invoice Details Grid */}
           <div className="generator-details">
-            <div className="generator-details-title">Invoice Details</div>
+            <div className="generator-details-title" style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', marginBottom: '12px' }}>
+              Invoice Details
+            </div>
             <div className="grid four">
               <div>
                 <label>
@@ -429,37 +504,173 @@ export default function InvoiceGeneratorPage() {
           {/* Items Section shown ONLY when Client is selected */}
           {customerId ? (
             <>
+              {/* Milestone Billing Quick Selector */}
+              {clientMilestoneProjects.length > 0 && (
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '16px 18px',
+                    marginBottom: '18px',
+                    boxShadow: 'none'
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '12px',
+                      flexWrap: 'wrap',
+                      gap: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span
+                        style={{
+                          background: selectedMilestoneId ? '#f0f9ff' : '#f1f5f9',
+                          color: selectedMilestoneId ? '#0284c7' : '#475569',
+                          border: `1px solid ${selectedMilestoneId ? '#bae6fd' : '#e2e8f0'}`,
+                          padding: '3px 9px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: 700
+                        }}
+                      >
+                        Milestone Billing
+                      </span>
+                      <strong style={{ fontSize: '13px', color: '#0f172a' }}>
+                        {selectedMilestoneId ? 'Milestone Selected for Invoicing' : 'Bill Specific Project Milestone (Optional)'}
+                      </strong>
+                    </div>
+                    {selectedMilestoneId && (
+                      <button
+                        type="button"
+                        className="btn xs light"
+                        onClick={handleClearMilestoneSelection}
+                        style={{ fontSize: '11.5px', padding: '4px 12px', borderRadius: '9999px', color: '#dc2626', borderColor: '#fecaca' }}
+                      >
+                        ✕ Clear Selection &amp; Bill All Items
+                      </button>
+                    )}
+                  </div>
+
+                  {clientMilestoneProjects.map((proj) => (
+                    <div key={proj.id} style={{ marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1e293b' }}>
+                          {proj.name}
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px' }}>
+                        {(proj.milestones || []).map((ms) => {
+                          const clientInvoices = state.invoices.filter((i) => i.customerId === customerId);
+                          const metrics = getMilestoneLiveMetrics(ms, clientInvoices);
+                          const isSelected = selectedMilestoneId === ms.id;
+                          const isInvoiced = metrics.isInvoiced;
+
+                          return (
+                            <button
+                              key={ms.id}
+                              type="button"
+                              onClick={() => {
+                                if (isInvoiced) {
+                                  alert(`Milestone "${ms.name}" has already been invoiced (${metrics.invoiceNo || 'INV'}). Prevent duplicate invoice generation.`);
+                                  return;
+                                }
+                                handleSelectMilestoneToInvoice(proj, ms);
+                              }}
+                              style={{
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                textAlign: 'left',
+                                cursor: isInvoiced ? 'not-allowed' : 'pointer',
+                                opacity: isInvoiced ? 0.65 : 1,
+                                border: `1.5px solid ${isSelected ? '#0284c7' : '#e2e8f0'}`,
+                                background: isSelected ? '#f0f9ff' : isInvoiced ? '#f8fafc' : '#ffffff',
+                                boxShadow: 'none',
+                                transition: 'all 0.15s ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: isSelected ? '#0284c7' : '#0f172a' }}>
+                                  {isSelected ? '✓ ' : ''}{ms.name}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: isInvoiced ? '#f1f5f9' : ms.status === 'Ready to Invoice' ? '#dcfce7' : '#fef9c3',
+                                    color: isInvoiced ? '#475569' : ms.status === 'Ready to Invoice' ? '#15803d' : '#854d0e',
+                                    border: `1px solid ${isInvoiced ? '#e2e8f0' : ms.status === 'Ready to Invoice' ? '#bbf7d0' : '#fef08a'}`,
+                                    fontWeight: 650,
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {metrics.status} {isInvoiced && metrics.invoiceNo ? `(${metrics.invoiceNo})` : ''}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px' }}>
+                                <span style={{ fontWeight: 800, color: isSelected ? '#0284c7' : '#334155' }}>
+                                  {money(ms.amount, currency)}
+                                </span>
+                                {ms.type === 'percentage' && (
+                                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                    {ms.percentage}% of project
+                                  </span>
+                                )}
+                              </div>
+                              {(ms.startDate || ms.dueDate) && (
+                                <div style={{ fontSize: '10.5px', color: '#64748b', display: 'flex', gap: '10px', marginTop: '2px', borderTop: '1px dashed #e2e8f0', paddingTop: '4px' }}>
+                                  {ms.startDate && <span>Start: <strong style={{ color: '#334155' }}>{ms.startDate}</strong></span>}
+                                  {ms.dueDate && <span>Due: <strong style={{ color: '#334155' }}>{ms.dueDate}</strong></span>}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <InvoiceItems
                 items={items}
                 onChange={setItems}
                 currency={currency}
               />
 
-              <div className="generator-summary-wrap">
-                <div className="generator-summary">
+              <div className="generator-summary-wrap" style={{ marginTop: '18px', display: 'flex', justifyContent: 'flex-end' }}>
+                <div className="generator-summary" style={{ width: '380px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px', boxShadow: 'none' }}>
                   <div className="totals">
-                    <div className="tline">
+                    <div className="tline" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '13px', color: '#475569' }}>
                       <span>Current Month Subtotal</span>
-                      <strong>{money(totals.subtotal, currency)}</strong>
+                      <strong style={{ color: '#0f172a' }}>{money(totals.subtotal, currency)}</strong>
                     </div>
 
                     {previousDuesAmount > 0 && includePreviousDues && (
-                      <div className="tline dues-tline">
+                      <div className="tline dues-tline" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '13px', color: '#b45309' }}>
                         <span>Previous Balance / Arrears {previousDuesMonths ? `(${previousDuesMonths})` : ''}</span>
                         <strong>+ {money(previousDuesAmount, currency)}</strong>
                       </div>
                     )}
 
-                    <div className="tline grand">
+                    <div className="tline grand" style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0 16px', borderTop: '1px solid #e2e8f0', marginTop: '6px', fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
                       <span>{effectivePreviousDues > 0 ? 'Total Payable (With Previous)' : 'Grand Total'}</span>
-                      <span>{money(finalGrandTotal, currency)}</span>
+                      <span style={{ color: '#0284c7', fontSize: '18px' }}>{money(finalGrandTotal, currency)}</span>
                     </div>
                   </div>
-                  <div className="generator-actions">
-                    <Button variant="light" onClick={handlePreview}>
+                  <div className="generator-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <Button variant="light" onClick={handlePreview} style={{ borderRadius: '8px', padding: '8px 16px', fontWeight: '600' }}>
                       Preview
                     </Button>
-                    <Button variant="primary" onClick={handleGenerateInvoice}>
+                    <Button variant="primary" onClick={handleGenerateInvoice} style={{ borderRadius: '8px', padding: '8px 18px', fontWeight: '600' }}>
                       Generate Invoice
                     </Button>
                   </div>

@@ -272,9 +272,9 @@ export default function WhatsAppPage() {
 
               {recipients.length > 0 && (
                 <div style={{
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  color: '#1e40af',
+                  background: '#eaf5ee',
+                  border: '1px solid #d1fae5',
+                  color: '#047857',
                   padding: '4px 12px',
                   borderRadius: '20px',
                   fontWeight: '700',
@@ -460,7 +460,8 @@ export default function WhatsAppPage() {
                     color: '#fff',
                     borderRadius: '10px',
                     padding: '16px 18px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+                    boxShadow: 'none',
+                    border: '1px solid #334155'
                   }}>
                     {/* Header with status badge & controls */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
@@ -470,7 +471,7 @@ export default function WhatsAppPage() {
                           height: '12px',
                           borderRadius: '50%',
                           background: broadcastStatus === 'paused' ? '#eab308' : '#22c55e',
-                          boxShadow: `0 0 10px ${broadcastStatus === 'paused' ? '#eab308' : '#22c55e'}`
+                          boxShadow: 'none'
                         }}></div>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '0.3px' }}>

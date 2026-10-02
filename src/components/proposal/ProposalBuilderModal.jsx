@@ -6,6 +6,7 @@ import { money, today } from '../../utils/formatters';
 import { downloadProposalFile, generateProposalHtml } from '../../utils/proposal';
 import { sendPdfToWhatsApp, downloadAsPdf, downloadAndSendWhatsApp } from '../../utils/whatsappPdf';
 import { useApp } from '../../context/AppContext';
+import { DEFAULT_SERVICES } from '../../utils/storage';
 
 const PRESET_TERMS = {
   preset1: `1. Validity: This commercial quotation is valid for 14 calendar days from the date of issuance.
@@ -33,6 +34,9 @@ export default function ProposalBuilderModal({
   const { state, showToast, updateSettings } = useApp();
   const savedProp = state.settings?.proposalData || {};
   const cur = business.currency || state.settings?.currency || 'PKR';
+  const savedServices = (state.settings?.services && Array.isArray(state.settings.services) && state.settings.services.length > 0)
+    ? state.settings.services
+    : DEFAULT_SERVICES;
 
   // Proposal Form State
   const [title, setTitle] = useState('');
@@ -108,10 +112,13 @@ export default function ProposalBuilderModal({
     ]);
   };
 
-  const handleUpdateItem = (index, field, value) => {
+  const handleUpdateItem = (index, fieldOrFields, value) => {
     setItems((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
+      const updates = typeof fieldOrFields === 'object' && fieldOrFields !== null
+        ? fieldOrFields
+        : { [fieldOrFields]: value };
+      updated[index] = { ...updated[index], ...updates };
       return updated;
     });
   };
@@ -123,6 +130,20 @@ export default function ProposalBuilderModal({
       }
       return prev.filter((_, i) => i !== index);
     });
+  };
+
+  const handleSelectService = (index, srv) => {
+    setItems((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        name: srv.name || updated[index].name,
+        price: srv.price !== undefined && srv.price !== '' ? Number(srv.price) : updated[index].price,
+        desc: srv.desc || updated[index].desc || ''
+      };
+      return updated;
+    });
+    showToast(`⚡ Selected "${srv.name}"`);
   };
 
   // Milestone Handlers
@@ -311,35 +332,36 @@ export default function ProposalBuilderModal({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={`Commercial Proposal Builder: ${customer.name || 'Client'}`}
+        title={`Commercial Proposal: ${customer.name || 'Client'}`}
         headerExtra={headerExtra}
         maxWidth="920px"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '11px' }}>
           {/* Client & Business Overview Card */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>CLIENT / RECIPIENT:</span>
-              <div style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>{customer.name || '-'}</div>
-              <div style={{ fontSize: '11.5px', color: '#475569' }}>Phone / WA: <strong>{customer.phone || customer.whatsapp || '-'}</strong></div>
+              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Client / Recipient:</span>
+              <div style={{ fontSize: '13px', fontWeight: '750', color: '#0f172a' }}>{customer.name || '-'}</div>
+              <div style={{ fontSize: '11px', color: '#475569' }}>Phone / WA: <strong>{customer.phone || customer.whatsapp || '-'}</strong></div>
             </div>
-            <div>
-              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>ISSUING BUSINESS / AGENCY:</span>
-              <div style={{ fontSize: '14px', fontWeight: '800', color: '#0b4b8f' }}>{savedProp.companyName || business.name || 'Commercial Proposal'}</div>
-              <div style={{ fontSize: '11.5px', color: '#475569' }}>
-                {savedProp.tagline ? <span>{savedProp.tagline} | </span> : (business.category ? <span>Category: <strong>{business.category}</strong> | </span> : '')}
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' }}>Issuing Agency:</span>
+              <div style={{ fontSize: '13px', fontWeight: '750', color: '#0b4b8f' }}>{savedProp.companyName || business.name || 'Commercial Proposal'}</div>
+              <div style={{ fontSize: '11px', color: '#475569' }}>
+                {savedProp.tagline ? <span>{savedProp.tagline} | </span> : (business.category ? <span>{business.category} | </span> : '')}
                 Currency: <strong>{cur}</strong>
               </div>
             </div>
           </div>
 
           {/* General Proposal Details */}
-          <div className="grid two" style={{ gap: '12px 14px' }}>
+          <div className="grid two" style={{ gap: '8px 12px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label>Proposal Subject / Title <span className="req">*</span></label>
+              <label style={{ fontSize: '11.5px', marginBottom: '3px', fontWeight: '600' }}>Proposal Subject / Title <span className="req">*</span></label>
               <input
                 className="input"
-                placeholder="e.g. Commercial Proposal & Quotation for Software / Services Deployment"
+                style={{ height: '32px', fontSize: '12px' }}
+                placeholder="e.g. Commercial Proposal & Quotation for Software Deployment"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoComplete="off"
@@ -347,22 +369,24 @@ export default function ProposalBuilderModal({
             </div>
 
             <div>
-              <label>Proposal Date</label>
+              <label style={{ fontSize: '11.5px', marginBottom: '3px', fontWeight: '600' }}>Proposal Date</label>
               <input
                 type="date"
                 className="input"
+                style={{ height: '32px', fontSize: '12px' }}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
 
             <div>
-              <label>Proposal Validity (Days)</label>
+              <label style={{ fontSize: '11.5px', marginBottom: '3px', fontWeight: '600' }}>Proposal Validity (Days)</label>
               <input
                 type="number"
                 min="1"
                 max="365"
                 className="input"
+                style={{ height: '32px', fontSize: '12px' }}
                 placeholder="14"
                 value={validityDays}
                 onChange={(e) => setValidityDays(Math.max(1, Number(e.target.value || 14)))}
@@ -371,29 +395,26 @@ export default function ProposalBuilderModal({
           </div>
 
           {/* 1. Project Overview & Scope Description (Optional Paragraph) */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '8px 12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '4px' }}>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: '800', color: '#0b4b8f', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                  1. Project Overview &amp; Introduction (Optional Paragraph)
+                <label style={{ fontSize: '11.5px', fontWeight: '750', color: '#0b4b8f', textTransform: 'uppercase', letterSpacing: '0.3px', margin: 0 }}>
+                  1. Project Overview &amp; Introduction (Optional)
                 </label>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>
-                  Write introductory details, project background, or client message to appear before deliverables.
-                </div>
               </div>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                <span style={{ fontSize: '10.5px', color: '#64748b', fontWeight: '600' }}>Presets:</span>
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '600' }}>Presets:</span>
                 <button
                   type="button"
                   onClick={() => setSummary(`We are pleased to submit this commercial proposal for ${customer?.name || 'your esteemed organization'}. Our team is committed to providing industry-leading services and high-quality deliverables tailored specifically to your operational requirements.`)}
-                  style={{ padding: '3px 8px', fontSize: '10.5px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', color: '#0b4b8f' }}
+                  style={{ padding: '2px 6px', fontSize: '10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', color: '#0b4b8f' }}
                 >
                   General Intro
                 </button>
                 <button
                   type="button"
                   onClick={() => setSummary(`This commercial proposal outlines the scope of work, technical architecture, deployment deliverables, and service commitments for ${customer?.name || 'Client'}.`)}
-                  style={{ padding: '3px 8px', fontSize: '10.5px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', color: '#0b4b8f' }}
+                  style={{ padding: '2px 6px', fontSize: '10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', color: '#0b4b8f' }}
                 >
                   Technical Scope
                 </button>
@@ -401,7 +422,7 @@ export default function ProposalBuilderModal({
                   <button
                     type="button"
                     onClick={() => setSummary('')}
-                    style={{ padding: '3px 8px', fontSize: '10.5px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
+                    style={{ padding: '2px 6px', fontSize: '10px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
                   >
                     Clear
                   </button>
@@ -414,39 +435,43 @@ export default function ProposalBuilderModal({
               placeholder="Enter introduction, project overview, or client message here..."
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              style={{ fontSize: '12px', width: '100%', borderRadius: '6px', background: '#fff' }}
+              style={{ fontSize: '11.5px', width: '100%', borderRadius: '5px', background: '#fff', padding: '6px 8px' }}
             />
           </div>
 
           {/* Interactive Deliverables & Pricing Table */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <div>
-                <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '800', color: '#0b4b8f', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                  {summary ? '2.' : '1.'} Deliverables, Scope &amp; Custom Pricing
+                <h4 style={{ margin: 0, fontSize: '12px', fontWeight: '750', color: '#0b4b8f', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  {summary ? '2.' : '1.'} Deliverables, Scope &amp; Pricing
                 </h4>
-                <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#64748b' }}>
-                  Enter your deliverable items, service descriptions, and exact custom prices below.
-                </p>
               </div>
-              <Button variant="light" size="xs" onClick={handleAddItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Button variant="light" size="xs" onClick={handleAddItem} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 8px', fontSize: '11px' }}>
                 <span>+</span>
                 <span>Add Deliverable Line</span>
               </Button>
             </div>
 
-            <div className="table-wrap" style={{ border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', minWidth: '0' }}>
+            {/* Datalist for 1-click service selection from Settings */}
+            <datalist id="proposal-services-datalist">
+              {savedServices.map((srv, sIdx) => (
+                <option key={srv.id || sIdx} value={srv.name} />
+              ))}
+            </datalist>
+
+            <div className="table-wrap" style={{ border: '1px solid #cbd5e1', borderRadius: '6px', overflowX: 'auto', background: '#fff' }}>
+              <table style={{ width: '100%', minWidth: '780px', borderCollapse: 'collapse', fontSize: '11.5px' }}>
                 <thead>
-                  <tr>
-                    <th style={{ width: '32px', textAlign: 'center' }}>#</th>
-                    <th>Deliverable / Service</th>
-                    <th style={{ width: '65px', textAlign: 'center' }}>Qty</th>
-                    <th style={{ width: '110px', textAlign: 'right' }}>Unit Price ({cur})</th>
-                    <th style={{ width: '95px', textAlign: 'right' }}>Discount ({cur})</th>
-                    <th style={{ width: '70px', textAlign: 'center' }}>Tax (%)</th>
-                    <th style={{ width: '115px', textAlign: 'right' }}>Total</th>
-                    <th style={{ width: '36px', textAlign: 'center' }}></th>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #cbd5e1' }}>
+                    <th style={{ width: '24px', textAlign: 'center', padding: '5px 4px' }}>#</th>
+                    <th style={{ minWidth: '340px', padding: '5px 6px' }}>DELIVERABLE / SERVICE</th>
+                    <th style={{ width: '48px', textAlign: 'center', padding: '5px 4px' }}>QTY</th>
+                    <th style={{ width: '90px', textAlign: 'right', padding: '5px 6px' }}>UNIT PRICE</th>
+                    <th style={{ width: '75px', textAlign: 'right', padding: '5px 6px' }}>DISCOUNT</th>
+                    <th style={{ width: '52px', textAlign: 'center', padding: '5px 4px' }}>TAX (%)</th>
+                    <th style={{ width: '90px', textAlign: 'right', padding: '5px 6px' }}>TOTAL</th>
+                    <th style={{ width: '28px', textAlign: 'center', padding: '5px 4px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -459,18 +484,67 @@ export default function ProposalBuilderModal({
                     const lineTotal = taxBase + lineTax;
 
                     return (
-                      <tr key={it.id || idx}>
-                        <td style={{ textAlign: 'center', color: '#64748b', fontSize: '11px' }}>{idx + 1}</td>
-                        <td>
-                          <input
-                            className="input"
-                            placeholder="e.g. Website Development"
-                            value={it.name}
-                            onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
-                            style={{ height: '32px', fontSize: '12px' }}
-                          />
+                      <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ textAlign: 'center', color: '#64748b', fontSize: '10.5px', padding: '4px' }}>{idx + 1}</td>
+                        <td style={{ padding: '4px 6px' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
+                            <select
+                              className="select"
+                              style={{
+                                height: '30px',
+                                fontSize: '11.5px',
+                                width: '150px',
+                                flexShrink: 0,
+                                background: '#f8fafc',
+                                fontWeight: '600',
+                                borderColor: '#cbd5e1',
+                                borderRadius: '5px',
+                                padding: '0 6px',
+                                cursor: 'pointer',
+                                textOverflow: 'ellipsis'
+                              }}
+                              value={savedServices.some(s => s.name === it.name) ? it.name : ''}
+                              title={it.name ? `Selected: ${it.name}` : 'Select Service from Settings Catalog'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val) return;
+                                const srv = savedServices.find(s => s.name === val || String(s.id) === val);
+                                if (srv) {
+                                  handleUpdateItem(idx, {
+                                    name: srv.name,
+                                    desc: srv.desc || it.desc || ''
+                                  });
+                                }
+                              }}
+                            >
+                              <option value="">⚡ Select Service...</option>
+                              {savedServices.map((srv, sIdx) => (
+                                <option key={srv.id || sIdx} value={srv.name} title={srv.name}>
+                                  {srv.name}
+                                </option>
+                              ))}
+                            </select>
+                            <input
+                              className="input"
+                              placeholder="Enter or customize deliverable title..."
+                              value={it.name}
+                              title={it.name || ''}
+                              onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
+                              style={{
+                                height: '30px',
+                                fontSize: '12px',
+                                flex: 1,
+                                minWidth: '180px',
+                                borderRadius: '5px',
+                                padding: '0 8px',
+                                background: '#ffffff',
+                                borderColor: '#cbd5e1',
+                                fontWeight: '550'
+                              }}
+                            />
+                          </div>
                         </td>
-                        <td>
+                        <td style={{ padding: '4px' }}>
                           <input
                             type="number"
                             min="1"
@@ -478,10 +552,10 @@ export default function ProposalBuilderModal({
                             placeholder="1"
                             value={it.qty}
                             onChange={(e) => handleUpdateItem(idx, 'qty', Math.max(1, Number(e.target.value || 1)))}
-                            style={{ height: '32px', textAlign: 'center', fontSize: '12px' }}
+                            style={{ height: '28px', textAlign: 'center', fontSize: '11.5px', padding: '0 2px' }}
                           />
                         </td>
-                        <td>
+                        <td style={{ padding: '4px 6px' }}>
                           <input
                             type="number"
                             min="0"
@@ -489,10 +563,10 @@ export default function ProposalBuilderModal({
                             placeholder="0"
                             value={it.price}
                             onChange={(e) => handleUpdateItem(idx, 'price', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-                            style={{ height: '32px', textAlign: 'right', fontSize: '12px', fontWeight: '700' }}
+                            style={{ height: '28px', textAlign: 'right', fontSize: '11.5px', fontWeight: '700', padding: '0 6px' }}
                           />
                         </td>
-                        <td>
+                        <td style={{ padding: '4px 6px' }}>
                           <input
                             type="number"
                             min="0"
@@ -500,10 +574,10 @@ export default function ProposalBuilderModal({
                             placeholder="0"
                             value={it.discount !== undefined ? it.discount : ''}
                             onChange={(e) => handleUpdateItem(idx, 'discount', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-                            style={{ height: '32px', textAlign: 'right', fontSize: '12px', color: Number(it.discount) > 0 ? '#dc2626' : undefined }}
+                            style={{ height: '28px', textAlign: 'right', fontSize: '11.5px', color: Number(it.discount) > 0 ? '#dc2626' : undefined, padding: '0 6px' }}
                           />
                         </td>
-                        <td>
+                        <td style={{ padding: '4px' }}>
                           <input
                             type="number"
                             min="0"
@@ -512,21 +586,21 @@ export default function ProposalBuilderModal({
                             placeholder="0"
                             value={it.taxPct !== undefined ? it.taxPct : ''}
                             onChange={(e) => handleUpdateItem(idx, 'taxPct', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-                            style={{ height: '32px', textAlign: 'center', fontSize: '12px', color: Number(it.taxPct) > 0 ? '#0369a1' : undefined }}
+                            style={{ height: '28px', textAlign: 'center', fontSize: '11.5px', color: Number(it.taxPct) > 0 ? '#0369a1' : undefined, padding: '0 2px' }}
                           />
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: '800', color: '#0f172a', fontSize: '12px' }}>
+                        <td style={{ textAlign: 'right', fontWeight: '750', color: '#0f172a', fontSize: '11.5px', padding: '4px 6px', whiteSpace: 'nowrap' }}>
                           {money(lineTotal, cur)}
                         </td>
-                        <td style={{ textAlign: 'center' }}>
+                        <td style={{ textAlign: 'center', padding: '4px' }}>
                           <button
                             type="button"
                             className="action-icon-btn delete"
                             title="Remove Line"
                             onClick={() => handleRemoveItem(idx)}
-                            style={{ width: '26px', height: '26px' }}
+                            style={{ width: '24px', height: '24px' }}
                           >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="3 6 5 6 21 6"></polyline>
                               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                             </svg>
@@ -539,28 +613,28 @@ export default function ProposalBuilderModal({
                 <tfoot>
                   {(totalDiscount > 0 || totalTaxAmount > 0) && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'right', fontWeight: '750', fontSize: '11px', background: '#f8fafc', color: '#475569' }}>Subtotal:</td>
-                      <td style={{ textAlign: 'right', fontWeight: '750', fontSize: '11.5px', background: '#f8fafc' }}>{money(subtotal, cur)}</td>
+                      <td colSpan={6} style={{ textAlign: 'right', fontWeight: '700', fontSize: '10.5px', background: '#f8fafc', color: '#475569', padding: '3px 6px' }}>Subtotal:</td>
+                      <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', background: '#f8fafc', padding: '3px 6px' }}>{money(subtotal, cur)}</td>
                       <td style={{ background: '#f8fafc' }}></td>
                     </tr>
                   )}
                   {totalDiscount > 0 && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'right', fontSize: '11px', color: '#dc2626', background: '#f8fafc' }}>Total Discount:</td>
-                      <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', color: '#dc2626', background: '#f8fafc' }}>- {money(totalDiscount, cur)}</td>
+                      <td colSpan={6} style={{ textAlign: 'right', fontSize: '10.5px', color: '#dc2626', background: '#f8fafc', padding: '3px 6px' }}>Total Discount:</td>
+                      <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '10.5px', color: '#dc2626', background: '#f8fafc', padding: '3px 6px' }}>- {money(totalDiscount, cur)}</td>
                       <td style={{ background: '#f8fafc' }}></td>
                     </tr>
                   )}
                   {totalTaxAmount > 0 && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'right', fontSize: '11px', color: '#0369a1', background: '#f8fafc' }}>Total Tax:</td>
-                      <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', color: '#0369a1', background: '#f8fafc' }}>+ {money(totalTaxAmount, cur)}</td>
+                      <td colSpan={6} style={{ textAlign: 'right', fontSize: '10.5px', color: '#0369a1', background: '#f8fafc', padding: '3px 6px' }}>Total Tax:</td>
+                      <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '10.5px', color: '#0369a1', background: '#f8fafc', padding: '3px 6px' }}>+ {money(totalTaxAmount, cur)}</td>
                       <td style={{ background: '#f8fafc' }}></td>
                     </tr>
                   )}
                   <tr style={{ borderTop: '2px solid #0b4b8f' }}>
-                    <td colSpan={6} style={{ textAlign: 'right', fontWeight: '800', fontSize: '12px', color: '#0b4b8f', background: '#edf4fe', textTransform: 'uppercase' }}>TOTAL:</td>
-                    <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '12.5px', color: '#0b4b8f', background: '#edf4fe' }}>{money(grandTotal, cur)}</td>
+                    <td colSpan={6} style={{ textAlign: 'right', fontWeight: '800', fontSize: '11.5px', color: '#0b4b8f', background: '#edf4fe', textTransform: 'uppercase', padding: '5px 6px' }}>TOTAL:</td>
+                    <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '12px', color: '#0b4b8f', background: '#edf4fe', padding: '5px 6px' }}>{money(grandTotal, cur)}</td>
                     <td style={{ background: '#edf4fe' }}></td>
                   </tr>
                 </tfoot>
@@ -569,63 +643,59 @@ export default function ProposalBuilderModal({
           </div>
 
           {/* Payment Milestones Section */}
-          <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #1e3a5f' }}>
-            {/* Dark Header */}
-            <div style={{ background: 'linear-gradient(135deg, #0f2744 0%, #0b4b8f 100%)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '18px' }}>💳</span>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#fff' }}>Payment Milestones &amp; Billing Schedule</div>
-                  <div style={{ fontSize: '10.5px', color: '#93c5fd' }}>Set structured percentage payments tied to project deliverables.</div>
-                </div>
+          <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #1e3a5f' }}>
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, #0f2744 0%, #0b4b8f 100%)', padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '14px' }}>💳</span>
+                <div style={{ fontSize: '12px', fontWeight: '750', color: '#fff' }}>Payment Milestones &amp; Billing Schedule</div>
                 {milestones.length > 0 && (
                   <span style={{
-                    fontSize: '10.5px',
+                    fontSize: '10px',
                     fontWeight: '750',
-                    padding: '3px 9px',
-                    borderRadius: '10px',
+                    padding: '2px 7px',
+                    borderRadius: '8px',
                     background: totalMilestonePct === 100 ? '#16a34a' : totalMilestonePct > 100 ? '#dc2626' : '#d97706',
                     color: '#fff'
                   }}>
-                    {totalMilestonePct}% {totalMilestonePct === 100 ? '✓ Balanced' : totalMilestonePct > 100 ? '⚠ Over 100%' : `(${100 - totalMilestonePct}% remaining)`}
+                    {totalMilestonePct}% {totalMilestonePct === 100 ? '✓ Balanced' : totalMilestonePct > 100 ? '⚠ Over 100%' : `(${100 - totalMilestonePct}% rem)`}
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '10.5px', color: '#93c5fd', fontWeight: '600' }}>Presets:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '10px', color: '#93c5fd', fontWeight: '600' }}>Presets:</span>
                 <button
                   type="button"
                   onClick={() => handleApplyMilestonePreset('50-50')}
                   style={{
-                    padding: '4px 8px', fontSize: '10.5px', fontWeight: '700',
+                    padding: '3px 7px', fontSize: '10px', fontWeight: '700',
                     background: 'rgba(255,255,255,0.12)', color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.25)', borderRadius: '5px', cursor: 'pointer'
+                    border: '1px solid rgba(255,255,255,0.25)', borderRadius: '4px', cursor: 'pointer'
                   }}
                   title="50% Advance, 50% Final"
                 >
-                  50 / 50
+                  50/50
                 </button>
                 <button
                   type="button"
                   onClick={() => handleApplyMilestonePreset('40-30-30')}
                   style={{
-                    padding: '4px 8px', fontSize: '10.5px', fontWeight: '700',
+                    padding: '3px 7px', fontSize: '10px', fontWeight: '700',
                     background: 'rgba(255,255,255,0.12)', color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.25)', borderRadius: '5px', cursor: 'pointer'
+                    border: '1px solid rgba(255,255,255,0.25)', borderRadius: '4px', cursor: 'pointer'
                   }}
                   title="40% Advance, 30% Beta, 30% Final"
                 >
-                  40 / 30 / 30
+                  40/30/30
                 </button>
                 <button
                   type="button"
                   onClick={handleAddMilestone}
                   style={{
-                    padding: '6px 14px', fontSize: '11px', fontWeight: '750',
+                    padding: '4px 10px', fontSize: '10.5px', fontWeight: '700',
                     background: '#fff', color: '#0b4b8f',
-                    border: 'none', borderRadius: '6px', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.18)'
+                    border: 'none', borderRadius: '4px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '3px'
                   }}
                 >
                   + Add Milestone
@@ -635,38 +705,38 @@ export default function ProposalBuilderModal({
 
             {/* Milestone Rows or Empty State */}
             {milestones.length > 0 ? (
-              <div style={{ background: '#0f2744', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ background: '#0f2744', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {milestones.map((ms, idx) => {
                   const msAmount = grandTotal > 0 ? (Number(ms.pct || 0) / 100) * grandTotal : 0;
                   return (
                     <div key={ms.id} style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 82px 110px 1fr 32px',
-                      gap: '8px',
+                      gridTemplateColumns: '1fr 70px 95px 1fr 28px',
+                      gap: '6px',
                       alignItems: 'center',
                       background: '#1a3a60',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      padding: '6px 8px',
                       border: '1px solid #1e4a7a'
                     }}>
                       {/* Numbered Name Input */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#93c5fd', minWidth: '18px' }}>{idx + 1}.</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '10.5px', fontWeight: '700', color: '#93c5fd', minWidth: '16px' }}>{idx + 1}.</span>
                         <input
                           className="input"
-                          placeholder={idx === 0 ? 'Advance Milestone (Contract Signing & Kickoff)' : idx === 1 ? 'Beta Prototype & Core Module Approval' : 'Final Deployment & Complete Handover'}
+                          placeholder={idx === 0 ? 'Advance Milestone (Signing & Kickoff)' : idx === 1 ? 'Beta Prototype Approval' : 'Final Deployment & Handover'}
                           value={ms.name}
                           onChange={(e) => handleUpdateMilestone(idx, 'name', e.target.value)}
                           style={{
-                            height: '32px', fontSize: '11.5px', flex: 1,
+                            height: '28px', fontSize: '11px', flex: 1,
                             background: '#0f2744', border: '1px solid #2d5fa0',
-                            color: '#e2e8f0', borderRadius: '6px'
+                            color: '#e2e8f0', borderRadius: '5px', padding: '0 6px'
                           }}
                         />
                       </div>
 
                       {/* Percentage */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                         <input
                           type="number"
                           min="0"
@@ -676,22 +746,21 @@ export default function ProposalBuilderModal({
                           value={ms.pct}
                           onChange={(e) => handleUpdateMilestone(idx, 'pct', e.target.value === '' ? '' : Math.min(100, Math.max(0, Number(e.target.value))))}
                           style={{
-                            height: '32px', textAlign: 'center', fontSize: '13px',
-                            fontWeight: '800', width: '52px',
+                            height: '28px', textAlign: 'center', fontSize: '12px',
+                            fontWeight: '750', width: '44px',
                             background: '#0f2744', border: '1px solid #2d5fa0',
-                            color: '#fff', borderRadius: '6px'
+                            color: '#fff', borderRadius: '5px', padding: '0 2px'
                           }}
                         />
-                        <span style={{ fontSize: '12px', color: '#93c5fd', fontWeight: '700' }}>%</span>
+                        <span style={{ fontSize: '11px', color: '#93c5fd', fontWeight: '700' }}>%</span>
                       </div>
 
                       {/* Amount Badge */}
                       <div style={{
-                        height: '32px', display: 'flex', alignItems: 'center',
+                        height: '28px', display: 'flex', alignItems: 'center',
                         justifyContent: 'center',
-                        background: 'transparent',
-                        fontSize: '12px', fontWeight: '800', color: '#4ade80',
-                        whiteSpace: 'nowrap', letterSpacing: '0.3px'
+                        fontSize: '11px', fontWeight: '750', color: '#4ade80',
+                        whiteSpace: 'nowrap'
                       }}>
                         {money(msAmount, cur)}
                       </div>
@@ -704,9 +773,9 @@ export default function ProposalBuilderModal({
                           value={ms.dueCondition || ''}
                           onChange={(e) => handleUpdateMilestone(idx, 'dueCondition', e.target.value)}
                           style={{
-                            height: '32px', fontSize: '11px',
+                            height: '28px', fontSize: '10.5px',
                             background: '#0f2744', border: '1px solid #2d5fa0',
-                            color: '#e2e8f0', borderRadius: '6px'
+                            color: '#e2e8f0', borderRadius: '5px', padding: '0 6px'
                           }}
                         />
                       </div>
@@ -718,9 +787,9 @@ export default function ProposalBuilderModal({
                           className="action-icon-btn delete"
                           title="Remove Milestone"
                           onClick={() => handleRemoveMilestone(idx)}
-                          style={{ width: '26px', height: '26px', color: '#f87171' }}
+                          style={{ width: '22px', height: '22px', color: '#f87171' }}
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                           </svg>
@@ -731,12 +800,12 @@ export default function ProposalBuilderModal({
                 })}
               </div>
             ) : (
-              <div style={{ background: '#0f2744', padding: '14px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>
+              <div style={{ background: '#0f2744', padding: '10px 14px', textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
                 <span>No milestones configured yet. Click </span>
                 <button
                   type="button"
                   onClick={() => handleApplyMilestonePreset('50-50')}
-                  style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px' }}
                 >
                   [50/50]
                 </button>
@@ -744,7 +813,7 @@ export default function ProposalBuilderModal({
                 <button
                   type="button"
                   onClick={() => handleApplyMilestonePreset('40-30-30')}
-                  style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px' }}
                 >
                   [40/30/30]
                 </button>
@@ -752,7 +821,7 @@ export default function ProposalBuilderModal({
                 <button
                   type="button"
                   onClick={handleAddMilestone}
-                  style={{ background: 'transparent', border: 'none', color: '#4ade80', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer' }}
+                  style={{ background: 'transparent', border: 'none', color: '#4ade80', fontWeight: '700', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px' }}
                 >
                   + Add Milestone
                 </button>
@@ -761,57 +830,55 @@ export default function ProposalBuilderModal({
             )}
           </div>
 
-
           {/* Terms & Conditions — BELOW milestones */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ margin: 0, fontWeight: '700', fontSize: '12px' }}>Proposal Terms & Conditions</label>
-              <div className="preset-btn-group" style={{ gap: '4px' }}>
-                <span style={{ fontSize: '10.5px', color: '#64748b' }}>Quick Presets:</span>
-                <button type="button" className="preset-chip-btn" onClick={() => setTerms(PRESET_TERMS.preset1)} style={{ padding: '2px 6px', fontSize: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label style={{ margin: 0, fontWeight: '700', fontSize: '11.5px' }}>Proposal Terms &amp; Conditions</label>
+              <div className="preset-btn-group" style={{ gap: '3px' }}>
+                <span style={{ fontSize: '10px', color: '#64748b' }}>Quick Presets:</span>
+                <button type="button" className="preset-chip-btn" onClick={() => setTerms(PRESET_TERMS.preset1)} style={{ padding: '2px 5px', fontSize: '9.5px' }}>
                   Preset 1
                 </button>
-                <button type="button" className="preset-chip-btn" onClick={() => setTerms(PRESET_TERMS.preset2)} style={{ padding: '2px 6px', fontSize: '10px' }}>
+                <button type="button" className="preset-chip-btn" onClick={() => setTerms(PRESET_TERMS.preset2)} style={{ padding: '2px 5px', fontSize: '9.5px' }}>
                   Preset 2
                 </button>
-                <button type="button" className="preset-chip-btn" onClick={() => setTerms(PRESET_TERMS.preset3)} style={{ padding: '2px 6px', fontSize: '10px' }}>
+                <button type="button" className="preset-chip-btn" onClick={() => setTerms(PRESET_TERMS.preset3)} style={{ padding: '2px 5px', fontSize: '9.5px' }}>
                   Preset 3
                 </button>
               </div>
             </div>
             <textarea
               className="textarea"
-              rows={4}
+              rows={3}
               value={terms}
               onChange={(e) => setTerms(e.target.value)}
               placeholder="Enter custom commercial terms & conditions, payment milestones, delivery warranty..."
-              style={{ fontSize: '11.5px', lineHeight: '1.4' }}
+              style={{ fontSize: '11px', lineHeight: '1.4', padding: '6px 8px' }}
             />
           </div>
 
-
-
           {/* Bottom Actions */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
-            <Button variant="light" onClick={onClose}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '10px', marginTop: '2px' }}>
+            <Button variant="light" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Button variant="light" onClick={handleSaveProposal}>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <Button variant="light" size="sm" onClick={handleSaveProposal}>
                 Save Proposal
               </Button>
-              <Button variant="light" onClick={handleDownload}>
+              <Button variant="light" size="sm" onClick={handleDownload}>
                 Download PDF
               </Button>
               <Button
-                variant="green"
+                variant="primary"
+                size="sm"
                 onClick={handleSendWhatsApp}
                 disabled={isSendingWa}
-                style={{ background: '#10b981', color: '#fff' }}
+                style={{ background: '#0284c7', color: '#fff' }}
               >
                 {isSendingWa ? 'Sending...' : 'Send WhatsApp'}
               </Button>
-              <Button variant="primary" onClick={() => setIsPreviewOpen(true)}>
+              <Button variant="primary" size="sm" onClick={() => setIsPreviewOpen(true)}>
                 Fullscreen Preview
               </Button>
             </div>

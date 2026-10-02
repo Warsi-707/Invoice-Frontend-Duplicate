@@ -9,6 +9,13 @@ import ProposalPreviewModal from '../components/proposal/ProposalPreviewModal';
 import { validPhone, cleanPhoneInput, money, today } from '../utils/formatters';
 import { generateStatementHtml } from '../utils/statement';
 import { downloadAndSendWhatsApp, sendPdfToWhatsApp } from '../utils/whatsappPdf';
+import { subscriptionApi } from '../services/api';
+import {
+  calculateProjectMilestoneSummary,
+  getMilestoneLiveMetrics,
+  validateMilestonesTotal
+} from '../utils/milestone';
+import MilestoneSummaryCard from '../components/invoice/MilestoneSummaryCard';
 
 const PREDEFINED_CATEGORIES = [
   'Trading',
@@ -34,10 +41,13 @@ export default function BusinessCustomerPage() {
     deleteCustomerRecord,
     getBusiness,
     showToast,
-    setPreviewInvoice
+    refreshFromBackend,
+    setPreviewInvoice,
+    generateMilestoneInvoice
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [isProcessingSub, setIsProcessingSub] = useState(false);
 
   // 1. Edit / Add Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,6 +74,9 @@ export default function BusinessCustomerPage() {
 
   // 4. Commercial Proposal Modal State
   const [proposalTarget, setProposalTarget] = useState(null); // { customer, business, proposalData } or null
+
+  // 5. Project Milestone Billing Modal State
+  const [milestoneTarget, setMilestoneTarget] = useState(null); // { customer, business } or null
 
   // Reset Edit/Add Form
   const resetForm = () => {
@@ -266,10 +279,83 @@ export default function BusinessCustomerPage() {
     showToast(`Opening WhatsApp for ${customer.name}...`);
   };
 
+  // 5. Open Project Milestone Modal
+  const handleOpenMilestoneModal = (customer, business) => {
+    setMilestoneTarget({ customer, business });
+  };
+
+  // Generate Invoice for a specific Milestone
+  const handleGenerateMilestoneInvoice = (customer, business, project, milestone) => {
+    if (milestone.invoiceId) {
+      alert(`An invoice (${milestone.invoiceNo || 'INV'}) has already been generated for this milestone.`);
+      return;
+    }
+
+    const res = generateMilestoneInvoice(customer, business, project, milestone);
+    if (res.duplicate) {
+      alert(res.message || 'Invoice already exists for this milestone.');
+      return;
+    }
+
+    if (res.success && res.invoice) {
+      showToast(`✅ Invoice ${res.invoice.invoiceNo} generated for milestone "${milestone.name}"!`);
+      setPreviewInvoice(res.invoice);
+    }
+  };
+
+  // Toggle milestone status between Pending and Ready to Invoice
+  const handleToggleMilestoneStatus = (customer, business, project, milestone, newStatus) => {
+    if (milestone.invoiceId) {
+      alert('This milestone has already been invoiced and its status cannot be changed manually.');
+      return;
+    }
+
+    const updatedItems = (customer.items || []).map((it) => {
+      if (it.id === project.id && Array.isArray(it.milestones)) {
+        return {
+          ...it,
+          milestones: it.milestones.map((m) =>
+            m.id === milestone.id ? { ...m, status: newStatus } : m
+          )
+        };
+      }
+      return it;
+    });
+
+    updateBusinessAndCustomer({
+      customerId: customer.id,
+      businessId: business.id,
+      businessName: business.name || '',
+      category: business.category || '',
+      phone: customer.phone || business.phone || '',
+      whatsapp: customer.whatsapp || business.whatsapp || '',
+      businessAddress: business.address || '',
+      customerName: customer.name || '',
+      items: updatedItems
+    });
+
+    showToast(`Milestone status updated to "${newStatus}"`);
+  };
+
   // Delete Customer
   const handleDeleteCustomer = (customerId) => {
     if (confirm('Delete this Business / Client record?')) {
       deleteCustomerRecord(customerId);
+    }
+  };
+
+  // Process Due Subscriptions Handler
+  const handleProcessSubscriptions = async () => {
+    setIsProcessingSub(true);
+    try {
+      showToast('⚡ Checking & processing active subscriptions...');
+      const res = await subscriptionApi.process();
+      await refreshFromBackend();
+      showToast(`✅ ${res.message || 'Subscriptions processed successfully'}`);
+    } catch (err) {
+      alert('Subscription processing error: ' + (err.message || err));
+    } finally {
+      setIsProcessingSub(false);
     }
   };
 
@@ -300,26 +386,64 @@ export default function BusinessCustomerPage() {
   return (
     <section id="businesses" className="page active">
       <div className="panel">
-        <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>Business / Client Directory</span>
-            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>({rows.length} Records)</span>
+        <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>Business & Client Directory</span>
+            <span style={{ fontSize: '11px', color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+              {rows.length} Records
+            </span>
           </div>
-          <Button
-            variant="light"
-            size="sm"
-            onClick={handleOpenAddModal}
-            style={{
-              padding: '5px 12px',
-              fontSize: '12px',
-              background: '#ffffff',
-              color: '#0b4b8f',
-              border: '1px solid #cbd5e1',
-              fontWeight: '700'
-            }}
-          >
-            + Add Business & Client
-          </Button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleProcessSubscriptions}
+              disabled={isProcessingSub}
+              style={{
+                height: '32px',
+                padding: '0 14px',
+                fontSize: '12px',
+                background: '#ffffff',
+                color: '#0284c7',
+                border: '1px solid #bae6fd',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: isProcessingSub ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                boxShadow: 'none',
+                transition: 'all 0.15s ease'
+              }}
+              title="Trigger background check for due recurring subscriptions and auto-generate cycle invoices"
+            >
+              {isProcessingSub ? 'Processing...' : '⚡ Run Subscriptions Auto-Billing'}
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              style={{
+                height: '32px',
+                padding: '0 14px',
+                fontSize: '12px',
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Business & Client
+            </button>
+          </div>
         </div>
         <div className="panel-body">
           <div className="toolbar">
@@ -335,42 +459,116 @@ export default function BusinessCustomerPage() {
             </div>
           </div>
 
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap" style={{ overflowX: 'hidden', width: '100%' }}>
+            <table style={{ width: '100%', minWidth: 'unset', tableLayout: 'auto' }}>
               <thead>
                 <tr>
-                  <th>Business</th>
-                  <th>Category</th>
-                  <th>Client</th>
-                  <th>Phone No</th>
-                  <th>WhatsApp No</th>
-                  <th>Business Address</th>
-                  <th>Invoices</th>
-                  <th>Outstanding</th>
-                  <th style={{ minWidth: '180px', textAlign: 'center' }}>Action</th>
+                  <th style={{ padding: '9px 8px', paddingLeft: '14px', whiteSpace: 'nowrap' }}>Business</th>
+                  <th style={{ padding: '9px 8px', whiteSpace: 'nowrap' }}>Category</th>
+                  <th style={{ padding: '9px 8px', whiteSpace: 'nowrap' }}>Client</th>
+                  <th style={{ padding: '9px 8px', whiteSpace: 'nowrap' }}>Phone No</th>
+                  <th style={{ padding: '9px 8px', whiteSpace: 'nowrap' }}>WhatsApp No</th>
+                  <th style={{ padding: '9px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>Business Address</th>
+                  <th style={{ padding: '9px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>Invoices</th>
+                  <th style={{ padding: '9px 8px', whiteSpace: 'nowrap' }}>Outstanding</th>
+                  <th style={{ padding: '9px 8px', paddingRight: '14px', textAlign: 'center', whiteSpace: 'nowrap', width: '145px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length > 0 ? (
                   rows.map(({ customer: c, business: b, custInvoices, invoiceCount, totalBilled, totalPaid, outstanding }) => (
                     <tr key={c.id}>
-                      <td>
+                      <td style={{ padding: '10px 8px', paddingLeft: '14px', whiteSpace: 'nowrap' }}>
                         <strong>{b.name || '-'}</strong>
                       </td>
-                      <td>{b.category || '-'}</td>
-                      <td>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>{b.category || '-'}</td>
+                      <td style={{ padding: '10px 8px' }}>
                         <strong>{c.name}</strong>
+                        {Array.isArray(c.items) && c.items.some((it) => it.billingType === 'subscription') && (
+                          <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            {c.items.filter((it) => it.billingType === 'subscription').map((it, sIdx) => (
+                              <span
+                                key={it.id || sIdx}
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '600',
+                                  padding: '3px 8px',
+                                  background: '#f0f9ff',
+                                  color: '#0284c7',
+                                  border: '1px solid #bae6fd',
+                                  borderRadius: '8px',
+                                  display: 'inline-flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'flex-start',
+                                  gap: '1px'
+                                }}
+                                title={`Service: ${it.name} | Next Due: ${it.nextDueDate || 'Upcoming'} | Rate: ${money(it.price || 0, b.currency || 'PKR')}`}
+                              >
+                                <span style={{ whiteSpace: 'nowrap', lineHeight: '1.25' }}>
+                                  {(it.billingCycle || 'Monthly').toUpperCase()}: Due
+                                </span>
+                                <span style={{ whiteSpace: 'nowrap', fontSize: '9.5px', color: '#0284c7', lineHeight: '1.25' }}>
+                                  {it.nextDueDate || 'Auto'}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Project Based Badges (Clean 2-line format) */}
+                        {Array.isArray(c.items) && c.items.some((it) => it.billingType !== 'subscription') && (
+                          <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            {c.items.filter((it) => it.billingType !== 'subscription').map((it, mIdx) => {
+                              const isMs = it.projectBillingMode === 'milestone';
+                              const msCount = it.milestones?.length || 0;
+                              const invoicedCount = (it.milestones || []).filter((m) => m.invoiceId || m.status === 'Invoiced' || m.status === 'Paid').length;
+                              return (
+                                <span
+                                  key={it.id || mIdx}
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: '600',
+                                    padding: isMs ? '3px 8px' : '2px 8px',
+                                    background: isMs ? '#f0f9ff' : '#f8fafc',
+                                    color: isMs ? '#0284c7' : '#475569',
+                                    border: isMs ? '1px solid #bae6fd' : '1px solid #e2e8f0',
+                                    borderRadius: isMs ? '8px' : '12px',
+                                    cursor: 'default',
+                                    userSelect: 'none',
+                                    display: 'inline-flex',
+                                    flexDirection: isMs ? 'column' : 'row',
+                                    alignItems: 'flex-start',
+                                    gap: isMs ? '1px' : '0'
+                                  }}
+                                  title={isMs ? `Project: ${it.name || 'Deliverables'} | ${msCount} Milestones (${invoicedCount} Invoiced)` : `Project: ${it.name || 'Service'} | Rate: ${money(it.price || it.amount || 0, b.currency || 'PKR')}`}
+                                >
+                                  {isMs ? (
+                                    <>
+                                      <span style={{ whiteSpace: 'nowrap', lineHeight: '1.25' }}>
+                                        MILESTONE: {msCount} Milestone{msCount !== 1 ? 's' : ''}
+                                      </span>
+                                      <span style={{ whiteSpace: 'nowrap', fontSize: '9.5px', color: '#0284c7', lineHeight: '1.25' }}>
+                                        ({invoicedCount} Invoiced)
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span>PROJECT: Due {it.dueDate || 'Completion'}</span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
-                      <td>{c.phone || b.phone || '-'}</td>
-                      <td>{c.whatsapp || b.whatsapp || c.phone || '-'}</td>
-                      <td>{b.address || '-'}</td>
-                      <td>{invoiceCount}</td>
-                      <td>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>{c.phone || b.phone || '-'}</td>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>{c.whatsapp || b.whatsapp || c.phone || '-'}</td>
+                      <td style={{ padding: '10px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>{b.address || '-'}</td>
+                      <td style={{ padding: '10px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>{invoiceCount}</td>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
                         <span style={{ fontWeight: '700', color: outstanding > 0 ? '#dc2626' : '#16a34a' }}>
                           {money(outstanding, b.currency || state.settings?.currency)}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td style={{ padding: '10px 8px', paddingRight: '14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         {/* Sleek Flat Icon Action Toolbar */}
                         <div className="action-icon-toolbar">
                           {/* 1. View / Client Details Icon */}
@@ -409,7 +607,7 @@ export default function BusinessCustomerPage() {
                             title="Manage Services & Pricing List"
                             onClick={() => handleOpenServicesModal(c, b)}
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" />
                               <path d="M18 3v4m-2-2h4" />
                             </svg>
@@ -428,7 +626,7 @@ export default function BusinessCustomerPage() {
                             </svg>
                           </button>
 
-                          {/* 7. Delete Record Icon */}
+                          {/* 6. Delete Record Icon */}
                           <button
                             type="button"
                             className="action-icon-btn delete"
@@ -611,7 +809,7 @@ export default function BusinessCustomerPage() {
           isOpen={Boolean(viewingTarget)}
           onClose={() => setViewingTarget(null)}
           title={`Client Profile: ${viewingTarget.customer.name}`}
-          maxWidth="840px"
+          maxWidth="920px"
         >
           {(() => {
             const { customer, business } = viewingTarget;
@@ -696,21 +894,43 @@ export default function BusinessCustomerPage() {
                           <tr>
                             <th>#</th>
                             <th>Service / Item</th>
+                            <th>Billing Type</th>
                             <th style={{ textAlign: 'center' }}>Qty</th>
                             <th style={{ textAlign: 'right' }}>Unit Price</th>
                             <th style={{ textAlign: 'right' }}>Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {customer.items.map((it, idx) => (
-                            <tr key={it.id || idx}>
-                              <td>{idx + 1}</td>
-                              <td><strong>{it.name}</strong></td>
-                              <td style={{ textAlign: 'center' }}>{it.qty || 1}</td>
-                              <td style={{ textAlign: 'right' }}>{money(it.price || 0, cur)}</td>
-                              <td style={{ textAlign: 'right' }}><strong>{money((it.qty || 1) * (it.price || 0), cur)}</strong></td>
-                            </tr>
-                          ))}
+                          {customer.items.map((it, idx) => {
+                            const isSub = it.billingType === 'subscription';
+                            return (
+                              <tr key={it.id || idx}>
+                                <td>{idx + 1}</td>
+                                <td>
+                                  <strong>{it.name}</strong>
+                                  {isSub && (
+                                    <div style={{ fontSize: '10.5px', color: '#0284c7', marginTop: '2px' }}>
+                                      Start: {it.startDate || '-'} | Next Due: <strong>{it.nextDueDate || '-'}</strong> | Delivery: {it.deliveryMethod || 'whatsapp'}
+                                    </div>
+                                  )}
+                                </td>
+                                <td>
+                                  {isSub ? (
+                                    <span style={{ fontSize: '10.5px', fontWeight: '700', background: '#f0f9ff', color: '#0284c7', border: '1px solid #bae6fd', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center' }}>
+                                      {(it.billingCycle || 'Monthly').toUpperCase()} Sub
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '10.5px', fontWeight: '600', background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', padding: '2px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center' }}>
+                                      Project (One-Time)
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ textAlign: 'center' }}>{it.qty || 1}</td>
+                                <td style={{ textAlign: 'right' }}>{money(it.price || 0, cur)}</td>
+                                <td style={{ textAlign: 'right' }}><strong>{money((it.qty || 1) * (it.price || 0), cur)}</strong></td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -721,6 +941,144 @@ export default function BusinessCustomerPage() {
                   )}
                 </div>
 
+                {/* Project Milestones & Billing Section */}
+                {(() => {
+                  const milestoneProjects = (customer.items || []).filter(
+                    (it) => it.billingType !== 'subscription' && it.projectBillingMode === 'milestone' && Array.isArray(it.milestones) && it.milestones.length > 0
+                  );
+
+                  if (milestoneProjects.length === 0) return null;
+
+                  return (
+                    <div style={{ marginBottom: '18px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>
+                          Project Milestones & Billing ({milestoneProjects.length})
+                        </h4>
+                      </div>
+
+                      {milestoneProjects.map((proj, pIdx) => {
+                        const summary = calculateProjectMilestoneSummary(proj, custInvoices);
+                        return (
+                          <div key={proj.id || pIdx} style={{ marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>
+                                {proj.name || `Project ${pIdx + 1}`}
+                              </span>
+                              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
+                                Budget: {money(summary.projectTotal, cur)}
+                              </span>
+                            </div>
+
+                            <MilestoneSummaryCard summary={summary} currency={cur} title={`Summary: ${proj.name || 'Project'}`} />
+
+                            <div className="table-wrap">
+                              <table>
+                                <thead>
+                                  <tr>
+                                    <th>#</th>
+                                    <th>Milestone Description</th>
+                                    <th>Start Date</th>
+                                    <th>Due Date</th>
+                                    <th style={{ textAlign: 'right' }}>Amount / %</th>
+                                    <th>Status</th>
+                                    <th>Invoice Ref</th>
+                                    <th style={{ textAlign: 'right' }}>Paid / Balance</th>
+                                    <th style={{ textAlign: 'center' }}>Billing Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {proj.milestones.map((ms, mIdx) => {
+                                    const metrics = getMilestoneLiveMetrics(ms, custInvoices);
+                                    const isInvoiced = metrics.hasInvoice;
+
+                                    return (
+                                      <tr key={ms.id || mIdx}>
+                                        <td>{mIdx + 1}</td>
+                                        <td><strong>{ms.name}</strong></td>
+                                        <td>{ms.startDate || '-'}</td>
+                                        <td>{ms.dueDate || '-'}</td>
+                                        <td style={{ textAlign: 'right' }}>
+                                          <strong>{money(ms.amount || 0, cur)}</strong>
+                                          <div style={{ fontSize: '10px', color: '#64748b' }}>{ms.percentage}% of total</div>
+                                        </td>
+                                        <td>
+                                          <span style={{
+                                            fontSize: '10px',
+                                            fontWeight: '700',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            background: metrics.status === 'Paid' ? '#dcfce7' : metrics.status === 'Partially Paid' ? '#fef3c7' : metrics.status === 'Invoiced' ? '#e0e7ff' : ms.status === 'Ready to Invoice' ? '#fef9c3' : '#f1f5f9',
+                                            color: metrics.status === 'Paid' ? '#15803d' : metrics.status === 'Partially Paid' ? '#b45309' : metrics.status === 'Invoiced' ? '#3730a3' : ms.status === 'Ready to Invoice' ? '#854d0e' : '#475569',
+                                            border: `1px solid ${metrics.status === 'Paid' ? '#bbf7d0' : metrics.status === 'Partially Paid' ? '#fde68a' : metrics.status === 'Invoiced' ? '#c7d2fe' : ms.status === 'Ready to Invoice' ? '#fef08a' : '#cbd5e1'}`
+                                          }}>
+                                            {metrics.status || ms.status || 'Pending'}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          {metrics.invoiceNo ? (
+                                            <span style={{ fontWeight: '700', color: '#0b4b8f' }}>{metrics.invoiceNo}</span>
+                                          ) : (
+                                            <span style={{ color: '#94a3b8' }}>-</span>
+                                          )}
+                                        </td>
+                                        <td style={{ textAlign: 'right' }}>
+                                          {isInvoiced ? (
+                                            <div>
+                                              <div style={{ color: '#16a34a', fontWeight: '700', fontSize: '11px' }}>Paid: {money(metrics.paidAmount, cur)}</div>
+                                              <div style={{ color: metrics.outstandingAmount > 0 ? '#dc2626' : '#64748b', fontSize: '10.5px' }}>Bal: {money(metrics.outstandingAmount, cur)}</div>
+                                            </div>
+                                          ) : (
+                                            <span style={{ color: '#94a3b8' }}>Unbilled</span>
+                                          )}
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                          {isInvoiced ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const inv = state.invoices.find((i) => i.id === metrics.invoiceId || i.invoiceNo === metrics.invoiceNo);
+                                                if (inv) setPreviewInvoice(inv);
+                                              }}
+                                              style={{ fontSize: '10.5px', padding: '3px 10px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#334155' }}
+                                            >
+                                              View Invoice
+                                            </button>
+                                          ) : (
+                                            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                                              {ms.status !== 'Ready to Invoice' && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleToggleMilestoneStatus(customer, business, proj, ms, 'Ready to Invoice')}
+                                                  style={{ fontSize: '10px', padding: '3px 6px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}
+                                                >
+                                                  Mark Ready
+                                                </button>
+                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={() => handleGenerateMilestoneInvoice(customer, business, proj, ms)}
+                                                style={{ fontSize: '10.5px', padding: '3px 10px', background: '#1e40af', border: '1px solid #1e40af', borderRadius: '4px', cursor: 'pointer', color: '#fff', fontWeight: '700' }}
+                                              >
+                                                Generate Invoice
+                                              </button>
+                                            </div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+
                 {/* Invoices History Table */}
                 <div style={{ marginBottom: '16px' }}>
                   <h4 style={{ margin: '0 0 8px', fontSize: '13px', fontWeight: '700', color: '#1e293b' }}>
@@ -728,15 +1086,23 @@ export default function BusinessCustomerPage() {
                   </h4>
                   {custInvoices.length > 0 ? (
                     <div className="table-wrap" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                      <table>
+                      <table style={{ tableLayout: 'fixed', width: '100%' }}>
+                        <colgroup>
+                          <col style={{ width: '22%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '17%' }} />
+                          <col style={{ width: '17%' }} />
+                          <col style={{ width: '16%' }} />
+                        </colgroup>
                         <thead>
                           <tr>
                             <th>Invoice #</th>
                             <th>Date</th>
                             <th>Month</th>
-                            <th style={{ textAlign: 'right' }}>Total</th>
-                            <th style={{ textAlign: 'right' }}>Balance</th>
-                            <th>Status</th>
+                            <th style={{ textAlign: 'center' }}>Total</th>
+                            <th style={{ textAlign: 'center' }}>Balance</th>
+                            <th style={{ textAlign: 'center' }}>Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -745,13 +1111,13 @@ export default function BusinessCustomerPage() {
                               <td><strong>{inv.invoiceNo}</strong></td>
                               <td>{inv.date || '-'}</td>
                               <td>{inv.month} {inv.year}</td>
-                              <td style={{ textAlign: 'right' }}>{money(inv.total, cur)}</td>
-                              <td style={{ textAlign: 'right' }}>
+                              <td style={{ textAlign: 'center' }}>{money(inv.total, cur)}</td>
+                              <td style={{ textAlign: 'center' }}>
                                 <strong style={{ color: Number(inv.balance) > 0 ? '#dc2626' : '#16a34a' }}>
                                   {money(inv.balance, cur)}
                                 </strong>
                               </td>
-                              <td>
+                              <td style={{ textAlign: 'center' }}>
                                 <StatusBadge status={inv.status} />
                               </td>
                             </tr>
@@ -806,7 +1172,7 @@ export default function BusinessCustomerPage() {
           isOpen={Boolean(servicesTarget)}
           onClose={() => setServicesTarget(null)}
           title={`Manage Services & Pricing: ${servicesTarget.customer.name}`}
-          maxWidth="750px"
+          maxWidth="820px"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
@@ -839,6 +1205,250 @@ export default function BusinessCustomerPage() {
           customer={proposalTarget.customer}
           business={proposalTarget.business}
         />
+      )}
+
+      {/* 5. Dedicated Project Milestone Billing Modal */}
+      {milestoneTarget && (
+        <Modal
+          isOpen={Boolean(milestoneTarget)}
+          onClose={() => setMilestoneTarget(null)}
+          title={`Milestone Projects Billing: ${milestoneTarget.customer.name}`}
+          maxWidth="900px"
+        >
+          {(() => {
+            const { customer, business } = milestoneTarget;
+            const cur = business.currency || state.settings?.currency || 'PKR';
+            const custInvoices = state.invoices.filter((i) => i.customerId === customer.id);
+            const milestoneProjects = (customer.items || []).filter(
+              (it) => it.billingType !== 'subscription' && it.projectBillingMode === 'milestone' && Array.isArray(it.milestones) && it.milestones.length > 0
+            );
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                    Manage deliverables, milestones, and generate billing invoices for <strong>{customer.name}</strong> ({business.name}).
+                  </p>
+                  <Button
+                    variant="light"
+                    size="xs"
+                    onClick={() => {
+                      setMilestoneTarget(null);
+                      handleOpenServicesModal(customer, business);
+                    }}
+                  >
+                    ✏️ Configure / Add Milestones
+                  </Button>
+                </div>
+
+                {milestoneProjects.length > 0 ? (
+                  milestoneProjects.map((proj, pIdx) => {
+                    const summary = calculateProjectMilestoneSummary(proj, custInvoices);
+
+                    return (
+                      <div
+                        key={proj.id || pIdx}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          boxShadow: 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
+                          <div>
+                            <span style={{ fontSize: '14px', fontWeight: '750', color: '#0f172a' }}>
+                              {proj.name || `Project ${pIdx + 1}`}
+                            </span>
+                            <span style={{ marginLeft: '10px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                              Budget: <strong>{money(summary.projectTotal, cur)}</strong>
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: summary.remainingUnbilledAmount === 0 ? '#dcfce7' : '#fef9c3',
+                            color: summary.remainingUnbilledAmount === 0 ? '#15803d' : '#854d0e',
+                            border: `1px solid ${summary.remainingUnbilledAmount === 0 ? '#bbf7d0' : '#fef08a'}`
+                          }}>
+                            {summary.remainingUnbilledAmount === 0 ? 'Fully Billed' : `${money(summary.remainingUnbilledAmount, cur)} Unbilled`}
+                          </span>
+                        </div>
+
+                        {/* Project / Milestone Summary Card with 6 Required Metrics */}
+                        <MilestoneSummaryCard
+                          summary={summary}
+                          currency={cur}
+                          title={`Milestone Financial Summary: ${proj.name || 'Project'}`}
+                        />
+
+                        {/* Milestones Detailed List */}
+                        <div className="table-wrap" style={{ background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                          <table>
+                            <thead>
+                              <tr style={{ background: '#f8fafc' }}>
+                                <th>#</th>
+                                <th>Milestone Description</th>
+                                <th>Start Date</th>
+                                <th>Due Date</th>
+                                <th style={{ textAlign: 'right' }}>Amount / %</th>
+                                <th>Status</th>
+                                <th>Invoice Ref</th>
+                                <th style={{ textAlign: 'right' }}>Paid / Balance</th>
+                                <th style={{ textAlign: 'center' }}>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {proj.milestones.map((ms, mIdx) => {
+                                const metrics = getMilestoneLiveMetrics(ms, custInvoices);
+                                const isInvoiced = metrics.hasInvoice;
+
+                                return (
+                                  <tr key={ms.id || mIdx}>
+                                    <td>{mIdx + 1}</td>
+                                    <td>
+                                      <strong>{ms.name}</strong>
+                                    </td>
+                                    <td>{ms.startDate || '-'}</td>
+                                    <td>{ms.dueDate || '-'}</td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      <strong>{money(ms.amount || 0, cur)}</strong>
+                                      <div style={{ fontSize: '10px', color: '#64748b' }}>{ms.percentage}%</div>
+                                    </td>
+                                    <td>
+                                      <span style={{
+                                        fontSize: '10px',
+                                        fontWeight: '700',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        background: metrics.status === 'Paid' ? '#dcfce7' : metrics.status === 'Partially Paid' ? '#fef3c7' : metrics.status === 'Invoiced' ? '#e0e7ff' : ms.status === 'Ready to Invoice' ? '#fef9c3' : '#f1f5f9',
+                                        color: metrics.status === 'Paid' ? '#15803d' : metrics.status === 'Partially Paid' ? '#b45309' : metrics.status === 'Invoiced' ? '#3730a3' : ms.status === 'Ready to Invoice' ? '#854d0e' : '#475569',
+                                        border: `1px solid ${metrics.status === 'Paid' ? '#bbf7d0' : metrics.status === 'Partially Paid' ? '#fde68a' : metrics.status === 'Invoiced' ? '#c7d2fe' : ms.status === 'Ready to Invoice' ? '#fef08a' : '#cbd5e1'}`
+                                      }}>
+                                        {metrics.status || ms.status || 'Pending'}
+                                      </span>
+                                    </td>
+                                    <td>
+                                      {metrics.invoiceNo ? (
+                                        <span style={{ fontWeight: '700', color: '#0b4b8f' }}>
+                                          {metrics.invoiceNo}
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: '#94a3b8' }}>-</span>
+                                      )}
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      {isInvoiced ? (
+                                        <div>
+                                          <div style={{ color: '#16a34a', fontWeight: '700', fontSize: '11px' }}>
+                                            Paid: {money(metrics.paidAmount, cur)}
+                                          </div>
+                                          <div style={{ color: metrics.outstandingAmount > 0 ? '#dc2626' : '#64748b', fontSize: '10.5px' }}>
+                                            Bal: {money(metrics.outstandingAmount, cur)}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span style={{ color: '#94a3b8' }}>Unbilled</span>
+                                      )}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      {isInvoiced ? (
+                                        <Button
+                                          variant="light"
+                                          size="xs"
+                                          onClick={() => {
+                                            const inv = state.invoices.find((i) => i.id === metrics.invoiceId || i.invoiceNo === metrics.invoiceNo);
+                                            if (inv) setPreviewInvoice(inv);
+                                          }}
+                                          style={{ fontSize: '10.5px', padding: '2px 8px' }}
+                                        >
+                                          View Invoice
+                                        </Button>
+                                      ) : (
+                                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                                          {ms.status !== 'Ready to Invoice' && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleMilestoneStatus(customer, business, proj, ms, 'Ready to Invoice')}
+                                              style={{
+                                                fontSize: '10px',
+                                                padding: '2px 6px',
+                                                background: '#ffffff',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                color: '#475569'
+                                              }}
+                                              title="Mark milestone ready for invoicing"
+                                            >
+                                              Mark Ready
+                                            </button>
+                                          )}
+                                          <Button
+                                            variant="primary"
+                                            size="xs"
+                                            onClick={() => handleGenerateMilestoneInvoice(customer, business, proj, ms)}
+                                            style={{
+                                              fontSize: '10.5px',
+                                              padding: '2px 8px',
+                                              background: '#0284c7',
+                                              borderColor: '#0284c7'
+                                            }}
+                                          >
+                                            Generate Invoice
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{
+                    padding: '24px',
+                    background: '#f8fafc',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    border: '1px dashed #cbd5e1'
+                  }}>
+                    <div style={{ fontSize: '13px', fontWeight: '750', color: '#1e293b', marginBottom: '4px' }}>
+                      No Milestone-Based Projects Configured
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
+                      This client currently has One-Time or Subscription items. Switch an item to <strong>Milestone Based</strong> to create structured payment milestones.
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setMilestoneTarget(null);
+                        handleOpenServicesModal(customer, business);
+                      }}
+                      style={{ background: '#0284c7', borderColor: '#0284c7' }}
+                    >
+                      Configure Milestones Now
+                    </Button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '12px' }}>
+                  <Button variant="light" size="sm" onClick={() => setMilestoneTarget(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </Modal>
       )}
     </section>
   );

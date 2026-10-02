@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { loadStoredState, saveStoredState, DEFAULT_STATE } from '../utils/storage';
-import { uid, today, money } from '../utils/formatters';
+import { uid, today, money, MONTHS } from '../utils/formatters';
 import { nextInvoiceNo } from '../utils/invoice';
 import {
   bootstrapApi,
@@ -9,6 +9,7 @@ import {
   invoiceApi,
   reversalApi,
   settingsApi,
+  notificationApi,
   clearClientApiCache
 } from '../services/api';
 
@@ -44,7 +45,27 @@ export function AppProvider({ children }) {
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '' });
   const [isDbConnected, setIsDbConnected] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [selectedLedgerCustomerId, setSelectedLedgerCustomerId] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('invoice_manager_sidebar_collapsed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const toastTimerRef = useRef(null);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('invoice_manager_sidebar_collapsed', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
 
   const setCurrentPage = useCallback((page) => {
     setCurrentPageInternal(page);
@@ -77,6 +98,72 @@ export function AppProvider({ children }) {
     }, 2500);
   }, []);
 
+  // Fetch In-App Notifications
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const res = await notificationApi.getAll();
+      if (res) {
+        setNotifications(Array.isArray(res.notifications) ? res.notifications : []);
+        setUnreadNotificationsCount(typeof res.unreadCount === 'number' ? res.unreadCount : 0);
+      }
+    } catch (err) {
+      console.warn('Notifications fetch notice:', err.message);
+    }
+  }, []);
+
+  // Mark single notification as read
+  const markNotificationRead = useCallback(async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    setUnreadNotificationsCount((prev) => Math.max(0, prev - 1));
+    try {
+      await notificationApi.markAsRead(id);
+    } catch (e) {
+      console.warn('Error marking notification read:', e.message);
+    }
+  }, []);
+
+  // Mark all notifications as read
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadNotificationsCount(0);
+    try {
+      await notificationApi.markAllAsRead();
+    } catch (e) {
+      console.warn('Error marking all notifications read:', e.message);
+    }
+  }, []);
+
+  // Delete notification
+  const deleteNotification = useCallback(async (id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await notificationApi.delete(id);
+    } catch (e) {
+      console.warn('Error deleting notification:', e.message);
+    }
+  }, []);
+
+  // Open Client Ledger & Subscription for a specific customer
+  const openClientLedger = useCallback((customerId) => {
+    if (customerId) {
+      setSelectedLedgerCustomerId(customerId);
+      setCurrentPage('ledger');
+    }
+  }, [setCurrentPage]);
+
+  // Handle clicking a notification item
+  const handleNotificationClick = useCallback((notification) => {
+    if (!notification) return;
+    if (!notification.isRead) {
+      markNotificationRead(notification.id);
+    }
+    if (notification.customerId) {
+      openClientLedger(notification.customerId);
+    }
+  }, [markNotificationRead, openClientLedger]);
+
   // Fetch initial data from PostgreSQL / Neon DB Backend
   const refreshFromBackend = useCallback(async () => {
     try {
@@ -84,7 +171,13 @@ export function AppProvider({ children }) {
       if (data) {
         setState((prev) => ({
           ...prev,
-          settings: data.settings || prev.settings,
+          settings: {
+            ...prev.settings,
+            ...(data.settings || {}),
+            services: Array.isArray(data.settings?.services) && data.settings.services.length > 0
+              ? data.settings.services
+              : (prev.settings?.services || [])
+          },
           businesses: Array.isArray(data.businesses) ? data.businesses : [],
           customers: Array.isArray(data.customers) ? data.customers : [],
           invoices: Array.isArray(data.invoices) ? data.invoices : [],
@@ -92,15 +185,19 @@ export function AppProvider({ children }) {
         }));
         setIsDbConnected(true);
       }
+      refreshNotifications();
     } catch (err) {
       console.warn('Backend connection notice: running with cached state', err.message);
       setIsDbConnected(false);
     }
-  }, []);
+  }, [refreshNotifications]);
 
   useEffect(() => {
     refreshFromBackend();
-  }, [refreshFromBackend]);
+    // Poll notifications every 30 seconds
+    const notifTimer = setInterval(refreshNotifications, 30000);
+    return () => clearInterval(notifTimer);
+  }, [refreshFromBackend, refreshNotifications]);
 
   // Sync state changes to localStorage cache
   useEffect(() => {
@@ -244,10 +341,11 @@ export function AppProvider({ children }) {
 
     setState((prev) => {
       const filteredBiz = prev.businesses.filter(b => b.id !== tempBizId);
+      const filteredCust = prev.customers.filter(c => c.id !== tempCustId);
       return {
         ...prev,
-        businesses: [...filteredBiz, newBiz],
-        customers: [...prev.customers, newCust]
+        businesses: [newBiz, ...filteredBiz],
+        customers: [newCust, ...filteredCust]
       };
     });
 
@@ -264,18 +362,24 @@ export function AppProvider({ children }) {
       });
 
       if (res && res.business && res.customer) {
-        setState((prev) => ({
-          ...prev,
-          businesses: prev.businesses.map(b => (b.id === tempBizId ? res.business : b)),
-          customers: prev.customers.map(c => (c.id === tempCustId ? res.customer : c))
-        }));
+        setState((prev) => {
+          const updatedBiz = prev.businesses.map(b => (b.id === tempBizId ? res.business : b));
+          const updatedCust = prev.customers.map(c => (c.id === tempCustId ? res.customer : c));
+          return {
+            ...prev,
+            businesses: updatedBiz,
+            customers: updatedCust
+          };
+        });
       }
       showToast('Client added to Neon DB.');
+      setTimeout(refreshNotifications, 1000);
+      setTimeout(refreshFromBackend, 1800);
     } catch (err) {
       console.error('API Error adding client:', err);
       showToast('Saved locally.');
     }
-  }, [state.businesses, state.settings, showToast]);
+  }, [state.businesses, state.settings, showToast, refreshNotifications, refreshFromBackend]);
 
   const updateBusinessAndCustomer = useCallback(async ({
     customerId,
@@ -340,10 +444,12 @@ export function AppProvider({ children }) {
         customerName,
         items
       });
+      setTimeout(refreshNotifications, 1000);
+      setTimeout(refreshFromBackend, 1800);
     } catch (err) {
       console.error('API Error updating client:', err);
     }
-  }, [showToast]);
+  }, [showToast, refreshNotifications, refreshFromBackend]);
 
   const deleteCustomerRecord = useCallback(async (customerId) => {
     const hasInvoices = state.invoices.some((i) => i.customerId === customerId);
@@ -388,17 +494,30 @@ export function AppProvider({ children }) {
 
   // Invoice Generator Actions
   const createInvoice = useCallback((invoiceData) => {
-    // Check duplicate: same business, customer, month, year
-    const duplicate = state.invoices.find(
-      (x) =>
-        x.businessId === invoiceData.businessId &&
-        x.customerId === invoiceData.customerId &&
-        x.month === invoiceData.month &&
-        String(x.year) === String(invoiceData.year)
-    );
-
-    if (duplicate) {
-      return { duplicate: true };
+    // Check duplicate
+    let duplicate = null;
+    if (invoiceData.milestoneId) {
+      duplicate = state.invoices.find(
+        (x) => String(x.milestoneId) === String(invoiceData.milestoneId)
+      );
+      if (duplicate) {
+        return {
+          duplicate: true,
+          message: `Invoice (${duplicate.invoiceNo}) already exists for this milestone.`
+        };
+      }
+    } else {
+      // Check duplicate: same business, customer, month, year
+      duplicate = state.invoices.find(
+        (x) =>
+          x.businessId === invoiceData.businessId &&
+          x.customerId === invoiceData.customerId &&
+          x.month === invoiceData.month &&
+          String(x.year) === String(invoiceData.year)
+      );
+      if (duplicate) {
+        return { duplicate: true };
+      }
     }
 
     const business = getBusiness(invoiceData.businessId);
@@ -415,10 +534,42 @@ export function AppProvider({ children }) {
       payments: []
     };
 
-    setState((prev) => ({
-      ...prev,
-      invoices: [newInvoice, ...prev.invoices]
-    }));
+    setState((prev) => {
+      let updatedCustomers = prev.customers;
+      if (invoiceData.milestoneId) {
+        updatedCustomers = prev.customers.map((c) => {
+          if (c.id === invoiceData.customerId && Array.isArray(c.items)) {
+            const newItems = c.items.map((it) => {
+              if (Array.isArray(it.milestones)) {
+                return {
+                  ...it,
+                  milestones: it.milestones.map((ms) => {
+                    if (String(ms.id) === String(invoiceData.milestoneId)) {
+                      return {
+                        ...ms,
+                        invoiceId: tempId,
+                        invoiceNo: newNo,
+                        status: 'Invoiced'
+                      };
+                    }
+                    return ms;
+                  })
+                };
+              }
+              return it;
+            });
+            return { ...c, items: newItems };
+          }
+          return c;
+        });
+      }
+
+      return {
+        ...prev,
+        invoices: [newInvoice, ...prev.invoices],
+        customers: updatedCustomers
+      };
+    });
 
     // Dispatch async creation to PostgreSQL backend
     invoiceApi.create({
@@ -426,10 +577,42 @@ export function AppProvider({ children }) {
       invoiceNo: newNo
     }).then((res) => {
       if (res && res.invoice) {
-        setState((prev) => ({
-          ...prev,
-          invoices: prev.invoices.map((inv) => (inv.id === tempId ? res.invoice : inv))
-        }));
+        setState((prev) => {
+          let updatedCustomers = prev.customers;
+          if (invoiceData.milestoneId) {
+            updatedCustomers = prev.customers.map((c) => {
+              if (c.id === invoiceData.customerId && Array.isArray(c.items)) {
+                const newItems = c.items.map((it) => {
+                  if (Array.isArray(it.milestones)) {
+                    return {
+                      ...it,
+                      milestones: it.milestones.map((ms) => {
+                        if (String(ms.id) === String(invoiceData.milestoneId)) {
+                          return {
+                            ...ms,
+                            invoiceId: res.invoice.id,
+                            invoiceNo: res.invoice.invoiceNo,
+                            status: 'Invoiced'
+                          };
+                        }
+                        return ms;
+                      })
+                    };
+                  }
+                  return it;
+                });
+                return { ...c, items: newItems };
+              }
+              return c;
+            });
+          }
+
+          return {
+            ...prev,
+            invoices: prev.invoices.map((inv) => (inv.id === tempId ? res.invoice : inv)),
+            customers: updatedCustomers
+          };
+        });
       }
     }).catch((err) => {
       console.error('Invoice create API error:', err);
@@ -437,6 +620,63 @@ export function AppProvider({ children }) {
 
     return { success: true, invoice: newInvoice };
   }, [state.invoices, getBusiness]);
+
+  // Generate milestone-specific invoice
+  const generateMilestoneInvoice = useCallback((customer, business, project, milestone) => {
+    if (!customer || !milestone) {
+      return { success: false, message: 'Invalid customer or milestone data.' };
+    }
+
+    if (milestone.invoiceId) {
+      return {
+        success: false,
+        duplicate: true,
+        message: `Invoice (${milestone.invoiceNo || 'INV'}) already generated for this milestone.`
+      };
+    }
+
+    const mDueDate = milestone.dueDate || today();
+    let mDateObj = new Date(mDueDate);
+    if (isNaN(mDateObj.getTime())) mDateObj = new Date();
+    const monthName = MONTHS[mDateObj.getMonth()] || 'Milestone';
+    const yearStr = String(mDateObj.getFullYear());
+
+    const milestoneAmount = Number(milestone.amount || 0);
+    const projectName = project?.name || 'Project';
+    const cur = business?.currency || state.settings?.currency || 'PKR';
+
+    const invoicePayload = {
+      businessId: customer.businessId,
+      customerId: customer.id,
+      month: monthName,
+      year: yearStr,
+      date: today(),
+      dueDate: mDueDate,
+      items: [
+        {
+          id: uid('item'),
+          name: `${projectName} - Milestone: ${milestone.name}`,
+          qty: 1,
+          price: milestoneAmount,
+          amount: milestoneAmount,
+          billingType: 'project',
+          projectBillingMode: 'milestone',
+          milestoneId: milestone.id,
+          projectId: project?.id || null
+        }
+      ],
+      subtotal: milestoneAmount,
+      total: milestoneAmount,
+      balance: milestoneAmount,
+      paid: 0,
+      status: 'Unpaid',
+      milestoneId: milestone.id,
+      projectId: project?.id || null,
+      notes: `Milestone Billing for ${projectName}: ${milestone.name} (${milestone.percentage}% = ${money(milestoneAmount, cur)})`
+    };
+
+    return createInvoice(invoicePayload);
+  }, [createInvoice, state.settings?.currency]);
 
   // Payments & Reversals Actions
   const markInvoicePaid = useCallback((invoiceId) => {
@@ -694,7 +934,10 @@ export function AppProvider({ children }) {
           admin: restoredJson.settings.admin || 'Admin',
           currency: restoredJson.settings.currency || 'PKR',
           dueDays: restoredJson.settings.dueDays ?? 0,
-          footerNote: restoredJson.settings.footerNote ?? 'Thank you for your business.'
+          footerNote: restoredJson.settings.footerNote ?? 'Thank you for your business.',
+          proposalData: restoredJson.settings.proposalData || {},
+          whatsappSettings: restoredJson.settings.whatsappSettings || { initialDelay: 2, messageDelay: 3 },
+          services: Array.isArray(restoredJson.settings.services) ? restoredJson.settings.services : []
         },
         businesses: restoredJson.businesses,
         customers: restoredJson.customers,
@@ -761,13 +1004,27 @@ export function AppProvider({ children }) {
     updateBusinessAndCustomer,
     deleteCustomerRecord,
     createInvoice,
+    generateMilestoneInvoice,
     markInvoicePaid,
     takePartialPayment,
     reversePayment,
     updateSettings,
     backupData,
     restoreData,
-    clearAllData
+    clearAllData,
+    notifications,
+    unreadNotificationsCount,
+    selectedLedgerCustomerId,
+    setSelectedLedgerCustomerId,
+    refreshNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    deleteNotification,
+    openClientLedger,
+    handleNotificationClick,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    toggleSidebarCollapsed
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

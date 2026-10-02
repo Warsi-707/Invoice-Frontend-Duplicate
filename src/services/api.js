@@ -128,6 +128,19 @@ export const settingsApi = {
   reset: async () => request('/settings/reset', { method: 'POST' })
 };
 
+export const subscriptionApi = {
+  getSummary: async () => request('/subscriptions'),
+  process: async () => request('/subscriptions/process', { method: 'POST' })
+};
+
+export const notificationApi = {
+  getAll: async () => request('/notifications'),
+  markAsRead: async (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllAsRead: async () => request('/notifications/read-all', { method: 'POST' }),
+  delete: async (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  clearAll: async () => request('/notifications', { method: 'DELETE' })
+};
+
 export const whatsappApi = {
   getStatus: async () => request('/whatsapp/status'),
   connect: async (force = false) => request('/whatsapp/connect', { method: 'POST', body: { force } }),
@@ -138,4 +151,5 @@ export const whatsappApi = {
   sendDocument: async (phone, base64Data, fileName, mimeType, caption) =>
     request('/whatsapp/send-document', { method: 'POST', body: { phone, base64Data, fileName, mimeType, caption } })
 };
+
 

@@ -116,7 +116,7 @@ export default function InvoicePreview({
       maxWidth="850px"
       id="invoiceModalRoot"
     >
-      <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '8px', color: '#1e293b' }}>
+      <div style={{ background: '#ffffff', padding: '24px 28px', borderRadius: '8px', border: '1px solid #cbd5e1', color: '#1e293b' }}>
         {/* Top Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>

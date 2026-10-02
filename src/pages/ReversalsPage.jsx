@@ -24,9 +24,14 @@ export default function ReversalsPage() {
   return (
     <section id="reversals" className="page active">
       <div className="panel">
-        <div className="panel-head">
-          <span>Reversals</span>
-          <span>Payment Reversal History</span>
+        <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>Payment Reversals History</span>
+            <span style={{ fontSize: '11px', color: '#7c3aed', background: '#f3e8ff', border: '1px solid #e9d5ff', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+              {reversals.length} Records
+            </span>
+          </div>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>Audit log of reversed payments and adjustments</span>
         </div>
         <div className="panel-body">
           <div className="toolbar">

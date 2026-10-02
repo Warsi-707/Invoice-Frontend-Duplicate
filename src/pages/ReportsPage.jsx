@@ -43,13 +43,18 @@ export default function ReportsPage() {
   return (
     <section id="reports" className="page active">
       <div className="panel">
-        <div className="panel-head">
-          <span>Reports</span>
-          <span>Collection & Invoice Summary</span>
+        <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>Financial & Invoicing Reports</span>
+            <span style={{ fontSize: '11px', color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+              {filteredInvoices.length} Invoices
+            </span>
+          </div>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>Collection & Summary Analytics</span>
         </div>
         <div className="panel-body">
           {/* Filters Toolbar */}
-          <div className="toolbar enter-flow">
+          <div className="toolbar enter-flow" style={{ marginBottom: '16px' }}>
             <div className="sm">
               <label>Business</label>
               <select
@@ -94,7 +99,7 @@ export default function ReportsPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
-                <option value="">All</option>
+                <option value="">All Statuses</option>
                 <option value="Unpaid">Unpaid</option>
                 <option value="Partial">Partial</option>
                 <option value="Paid">Paid</option>
@@ -102,31 +107,37 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* KPIs */}
-          <div className="kpis">
-            <div className="kpi">
-              <small>Total Collection</small>
-              <strong>{money(totalCollected, activeCurrency)}</strong>
+          {/* Clean SaaS KPI Cards */}
+          <div className="cards" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', marginBottom: '18px' }}>
+            <div className="stat">
+              <div className="label">Total Collection</div>
+              <div className="value" style={{ color: '#0284c7', fontSize: '18px' }}>{money(totalCollected, activeCurrency)}</div>
+              <div className="hint">All payments received</div>
             </div>
-            <div className="kpi">
-              <small>Cash Collected</small>
-              <strong>{money(cashCollected, activeCurrency)}</strong>
+            <div className="stat">
+              <div className="label">Cash Collected</div>
+              <div className="value" style={{ color: '#0f172a', fontSize: '18px' }}>{money(cashCollected, activeCurrency)}</div>
+              <div className="hint">Cash mode</div>
             </div>
-            <div className="kpi">
-              <small>Online Collected</small>
-              <strong>{money(onlineCollected, activeCurrency)}</strong>
+            <div className="stat">
+              <div className="label">Online Collected</div>
+              <div className="value" style={{ color: '#0f172a', fontSize: '18px' }}>{money(onlineCollected, activeCurrency)}</div>
+              <div className="hint">Bank / Online transfer</div>
             </div>
-            <div className="kpi">
-              <small>Unpaid Invoices</small>
-              <strong>{unpaidCount}</strong>
+            <div className="stat">
+              <div className="label">Unpaid Invoices</div>
+              <div className="value" style={{ color: unpaidCount > 0 ? '#dc2626' : '#0284c7', fontSize: '18px' }}>{unpaidCount}</div>
+              <div className="hint">Pending collections</div>
             </div>
-            <div className="kpi">
-              <small>Paid Invoices</small>
-              <strong>{paidCount}</strong>
+            <div className="stat">
+              <div className="label">Paid Invoices</div>
+              <div className="value" style={{ color: '#0284c7', fontSize: '18px' }}>{paidCount}</div>
+              <div className="hint">Fully settled</div>
             </div>
-            <div className="kpi">
-              <small>Outstanding</small>
-              <strong>{money(totalOutstanding, activeCurrency)}</strong>
+            <div className="stat">
+              <div className="label">Outstanding</div>
+              <div className="value" style={{ color: totalOutstanding > 0 ? '#dc2626' : '#0284c7', fontSize: '18px' }}>{money(totalOutstanding, activeCurrency)}</div>
+              <div className="hint">Uncollected balance</div>
             </div>
           </div>
 

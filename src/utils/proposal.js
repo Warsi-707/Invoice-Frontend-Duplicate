@@ -18,16 +18,26 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
   }, 0) || (((subtotal - totalDiscount) * Number(proposal.taxPct || 0)) / 100);
   const grandTotal = Math.max(0, subtotal - totalDiscount + totalTaxAmount);
 
-  const bizName = proposal.companyName || business.name || business.companyName || 'iSysware Software Solution';
+  const p = business.proposalData || business.settings?.proposalData || {};
+  const bizName = proposal.companyName || p.companyName || business.name || business.companyName || 'iSysware Software Solution';
   const clientName = customer.name || proposal.clientName || 'Valued Client';
   const clientCompany = customer.company || proposal.clientCompany || '';
   const proposalNo = proposal.proposalNo || `PROP-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`;
   const proposalDate = proposal.date || new Date().toISOString().split('T')[0];
-  const validity = proposal.validity || `${proposal.validityDays || 15} Days from issuance`;
-  const summaryText = proposal.summary || `We are pleased to submit this commercial proposal for ${clientName}. Our team is committed to providing industry-leading services, robust software solutions, and high-quality deliverables tailored specifically to your operational requirements.`;
-  const termsText = proposal.terms || business.proposalData?.terms || DEFAULT_TERMS;
-  const sigName = proposal.signatoryName || business.signatoryName || business.proposalData?.signatoryName || 'Authorized Signature';
-  const sigTitle = proposal.signatoryTitle || business.signatoryTitle || business.proposalData?.signatoryTitle || 'Management Representative';
+  const validity = proposal.validity || `${proposal.validityDays || 14} Days from issuance`;
+  const termsText = proposal.terms || p.terms || DEFAULT_TERMS;
+  const sigName = proposal.signatoryName || p.signatoryName || business.signatoryName || 'Authorized Signature';
+  const sigTitle = proposal.signatoryTitle || p.signatoryTitle || business.signatoryTitle || 'Management Representative';
+
+  const hasSummary = Boolean(proposal.summary && proposal.summary.trim());
+  const hasMilestones = Array.isArray(proposal.milestones) && proposal.milestones.length > 0;
+  const hasTerms = Boolean(termsText && termsText.trim());
+
+  let secNum = 1;
+  const summarySecNum = hasSummary ? secNum++ : 0;
+  const delivSecNum = secNum++;
+  const milestoneSecNum = hasMilestones ? secNum++ : 0;
+  const termsSecNum = hasTerms ? secNum++ : 0;
 
   return `<!doctype html>
 <html>
@@ -36,75 +46,76 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
   <title>${esc(proposal.title || 'Commercial Proposal')} - ${esc(proposalNo)}</title>
   <style>
     @page {
-      size: A4 portrait;
-      margin: 8mm;
+      margin: 0;
     }
     * { box-sizing: border-box; }
     html, body {
       font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
       background: #ffffff !important;
       margin: 0 !important;
-      padding: 0 !important;
+      padding: 24px 0 !important;
       color: #0f172a;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     .a4-page {
-      width: 750px !important;
-      max-width: 750px !important;
-      margin: 0 !important;
+      width: 800px !important;
+      max-width: 800px !important;
+      margin: 0 auto !important;
       background: #ffffff !important;
-      border: 1.5px solid #cbd5e1 !important;
-      border-radius: 10px !important;
-      padding: 26px 30px !important;
+      padding: 24px 28px !important;
       box-sizing: border-box !important;
+      border: 1.5px solid #94a3b8 !important;
+      border-radius: 8px !important;
       color: #0f172a;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
     .prop-top-content {
       width: 100%;
     }
     .prop-head {
       border-bottom: 2px solid #0b4b8f;
-      padding-bottom: 14px;
+      padding-bottom: 16px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 20px;
     }
     .prop-brand h2 {
-      margin: 0 0 3px;
-      font-size: 20px;
+      margin: 0 0 4px;
+      font-size: 22px;
       font-weight: 800;
       color: #0b4b8f;
     }
     .prop-tagline {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
       color: #0284c7;
       margin-bottom: 4px;
     }
     .prop-brand p {
       margin: 2px 0;
-      font-size: 11px;
+      font-size: 12px;
       color: #475569;
     }
     .prop-tax-badge {
       display: inline-block;
       background: #f1f5f9;
       border: 1px solid #cbd5e1;
-      padding: 2px 6px;
+      padding: 3px 8px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       color: #334155;
-      margin-top: 4px;
+      margin-top: 5px;
     }
     .prop-meta {
       text-align: right;
-      font-size: 11px;
+      font-size: 12px;
     }
     .prop-meta div {
-      margin: 2px 0;
+      margin: 3px 0;
       color: #475569;
     }
     .prop-meta strong {
@@ -113,9 +124,9 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
     .prop-meta .prop-badge, .prop-badge {
       background: #0b4b8f !important;
       color: #ffffff !important;
-      font-size: 11px !important;
+      font-size: 12px !important;
       font-weight: 800 !important;
-      padding: 4px 10px !important;
+      padding: 5px 12px !important;
       border-radius: 4px !important;
       display: inline-block !important;
       text-transform: uppercase !important;
@@ -126,43 +137,43 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 16px;
-      margin: 14px 0 16px;
-      padding: 12px 14px;
+      margin: 16px 0 18px;
+      padding: 14px 16px;
       background: #f8fbff;
       border: 1px solid #dbeafe;
       border-radius: 8px;
       box-sizing: border-box;
     }
     .prop-client-card h4 {
-      margin: 0 0 4px;
-      font-size: 10px;
+      margin: 0 0 5px;
+      font-size: 11px;
       text-transform: uppercase;
       font-weight: 800;
       color: #0284c7;
     }
     .prop-client-card p {
       margin: 2px 0;
-      font-size: 11.5px;
+      font-size: 12.5px;
       color: #1e293b;
     }
     .prop-section {
-      margin-top: 14px;
+      margin-top: 16px;
       width: 100%;
       box-sizing: border-box;
     }
     .prop-section-title {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 800;
       color: #0b4b8f;
       text-transform: uppercase;
       letter-spacing: 0.3px;
-      margin-bottom: 6px;
+      margin-bottom: 7px;
       border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 3px;
+      padding-bottom: 4px;
     }
     .prop-overview-text {
-      font-size: 11px;
-      line-height: 1.5;
+      font-size: 12px;
+      line-height: 1.55;
       color: #334155;
       white-space: pre-line;
     }
@@ -171,35 +182,35 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
       min-width: 0 !important;
       table-layout: fixed;
       border-collapse: collapse;
-      margin-top: 6px;
+      margin-top: 7px;
       box-sizing: border-box;
     }
     .prop-table th {
       background: #eff6ff;
       color: #1e3a8a;
-      font-size: 10.5px;
+      font-size: 11.5px;
       font-weight: 750;
       text-transform: uppercase;
       letter-spacing: 0.3px;
-      padding: 6px 8px;
+      padding: 8px 10px;
       border: 1px solid #cbd5e1;
       text-align: left;
       box-sizing: border-box;
     }
     .prop-table td {
-      padding: 6px 8px;
-      font-size: 11px;
+      padding: 8px 10px;
+      font-size: 12px;
       border: 1px solid #e2e8f0;
       vertical-align: middle;
       word-break: break-word;
       box-sizing: border-box;
     }
     .prop-terms-box {
-      padding: 8px 12px;
+      padding: 10px 14px;
       background: #f8fafc;
-      border-left: 3px solid #0b4b8f;
-      font-size: 10.5px;
-      line-height: 1.55;
+      border-left: 3.5px solid #0b4b8f;
+      font-size: 11.5px;
+      line-height: 1.6;
       color: #334155;
       white-space: pre-line !important;
     }
@@ -207,44 +218,46 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
       display: grid !important;
       grid-template-columns: 1fr 1fr !important;
       gap: 80px !important;
-      margin-top: 32px !important;
+      margin-top: 36px !important;
       padding-top: 4px !important;
     }
     .prop-sig-line {
       text-align: center;
-      border-top: 1px solid #9aa6b6;
-      padding-top: 6px;
-      font-size: 10px;
-      color: #64748b;
+      border-top: 1.5px solid #94a3b8;
+      padding-top: 8px;
+      font-size: 11px;
+      color: #475569;
     }
     @media print {
-      body {
+      html, body {
         background: #ffffff !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: 24px 0 !important;
       }
       .a4-page {
-        width: 100% !important;
-        max-width: 100% !important;
-        border: 1.5px solid #cbd5e1 !important;
-        border-radius: 10px !important;
+        width: 800px !important;
+        max-width: 800px !important;
+        margin: 0 auto !important;
+        border: 1.5px solid #94a3b8 !important;
+        border-radius: 8px !important;
         box-shadow: none !important;
         page-break-inside: avoid !important;
+        break-inside: avoid !important;
       }
     }
   </style>
 </head>
 <body>
-  <div class="a4-page">
+  <div class="a4-page" style="width: 800px !important; max-width: 800px !important; margin: 0 auto !important; background: #ffffff !important; padding: 24px 28px !important; box-sizing: border-box !important; border: 1.5px solid #94a3b8 !important; border-radius: 8px !important; color: #0f172a; page-break-inside: avoid !important; break-inside: avoid !important;">
     <div class="prop-top-content">
       <!-- Letterhead Top Header -->
       <div class="prop-head">
         <div class="prop-brand">
           <h2>${esc(bizName)}</h2>
-          ${proposal.tagline ? `<div class="prop-tagline">${esc(proposal.tagline)}</div>` : ''}
-          ${(proposal.officeAddress || business.address) ? `<p>${esc(proposal.officeAddress || business.address)}</p>` : ''}
-          ${[proposal.supportPhone || business.phone, proposal.inquiryEmail || business.email, proposal.websiteUrl].filter(Boolean).length > 0 ? `<p>${esc([proposal.supportPhone || business.phone, proposal.inquiryEmail || business.email, proposal.websiteUrl].filter(Boolean).join(' • '))}</p>` : ''}
-          ${proposal.ntnTax ? `<div class="prop-tax-badge">${esc(proposal.ntnTax)}</div>` : ''}
+          ${(proposal.tagline || p.tagline || business.tagline) ? `<div class="prop-tagline">${esc(proposal.tagline || p.tagline || business.tagline)}</div>` : ''}
+          ${(proposal.officeAddress || p.officeAddress || business.address) ? `<p>${esc(proposal.officeAddress || p.officeAddress || business.address)}</p>` : ''}
+          ${[proposal.supportPhone || p.supportPhone || business.phone, proposal.inquiryEmail || p.inquiryEmail || business.email, proposal.websiteUrl || p.websiteUrl || business.website].filter(Boolean).length > 0 ? `<p>${esc([proposal.supportPhone || p.supportPhone || business.phone, proposal.inquiryEmail || p.inquiryEmail || business.email, proposal.websiteUrl || p.websiteUrl || business.website].filter(Boolean).join(' • '))}</p>` : ''}
+          ${(proposal.ntnTax || p.ntnTax || business.ntn) ? `<div class="prop-tax-badge">${esc(proposal.ntnTax || p.ntnTax || business.ntn)}</div>` : ''}
         </div>
         <div class="prop-meta">
           <div class="prop-badge" style="background: #0b4b8f !important; color: #ffffff !important; font-weight: 800 !important;">Commercial Proposal</div>
@@ -269,15 +282,17 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
         </div>
       </div>
 
-      <!-- 1. Overview -->
-      <div class="prop-section">
-        <div class="prop-section-title">1. Project Overview & Scope of Work</div>
-        <div class="prop-overview-text">${esc(summaryText)}</div>
-      </div>
+      <!-- Overview (Only when summary is provided) -->
+      ${hasSummary ? `
+        <div class="prop-section">
+          <div class="prop-section-title">${summarySecNum}. Project Overview & Scope of Work</div>
+          <div class="prop-overview-text">${esc(proposal.summary)}</div>
+        </div>
+      ` : ''}
 
-      <!-- 2. Deliverables Table -->
+      <!-- Deliverables Table -->
       <div class="prop-section">
-        <div class="prop-section-title">2. Deliverables & Commercial Pricing</div>
+        <div class="prop-section-title">${delivSecNum}. Deliverables & Commercial Pricing</div>
         <table class="prop-table">
           <thead>
             <tr>
@@ -348,10 +363,10 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
         </table>
       </div>
 
-      <!-- 3. Payment Milestones (If present) -->
-      ${proposal.milestones && proposal.milestones.length > 0 ? `
+      <!-- Payment Milestones (If present) -->
+      ${hasMilestones ? `
         <div class="prop-section">
-          <div class="prop-section-title">3. Payment Milestones & Billing Schedule</div>
+          <div class="prop-section-title">${milestoneSecNum}. Payment Milestones & Billing Schedule</div>
           <table class="prop-table">
             <thead>
               <tr>
@@ -380,14 +395,16 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
         </div>
       ` : ''}
 
-      <!-- 4. Terms & Conditions -->
-      <div class="prop-section">
-        <div class="prop-section-title">${proposal.milestones && proposal.milestones.length > 0 ? '4.' : '3.'} Payment Terms & Conditions</div>
-        <div class="prop-terms-box">${esc(termsText)}</div>
-      </div>
+      <!-- Terms & Conditions (If present) -->
+      ${hasTerms ? `
+        <div class="prop-section">
+          <div class="prop-section-title">${termsSecNum}. Payment Terms & Conditions</div>
+          <div class="prop-terms-box">${esc(termsText)}</div>
+        </div>
+      ` : ''}
     </div>
 
-    <!-- Signatures (Pinned at bottom of A4) -->
+    <!-- Signatures (Pinned at bottom of container) -->
     <div class="prop-sigs">
       <div class="prop-sig-line">
         <div>Client Signature</div>

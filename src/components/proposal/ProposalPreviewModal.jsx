@@ -36,6 +36,16 @@ export default function ProposalPreviewModal({
   const proposalDate = proposal.date || new Date().toISOString().split('T')[0];
   const validity = proposal.validity || '15 Days from issuance';
 
+  const hasSummary = Boolean(proposal.summary && proposal.summary.trim());
+  const hasMilestones = Array.isArray(proposal.milestones) && proposal.milestones.length > 0;
+  const hasTerms = Boolean(proposal.terms && proposal.terms.trim());
+
+  let secNum = 1;
+  const summarySecNum = hasSummary ? secNum++ : 0;
+  const delivSecNum = secNum++;
+  const milestoneSecNum = hasMilestones ? secNum++ : 0;
+  const termsSecNum = hasTerms ? secNum++ : 0;
+
   const handlePrint = () => {
     window.print();
   };
@@ -81,11 +91,11 @@ export default function ProposalPreviewModal({
   const headerExtra = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
       <Button
-        variant="green"
+        variant="primary"
         size="xs"
         onClick={handleSendWhatsApp}
         disabled={isSendingWa}
-        style={{ background: '#10b981', color: '#fff', padding: '4px 10px', fontSize: '11px' }}
+        style={{ background: '#0284c7', color: '#fff', padding: '4px 10px', fontSize: '11px' }}
       >
         {isSendingWa ? 'Sending...' : 'Send WhatsApp'}
       </Button>
@@ -141,17 +151,17 @@ export default function ProposalPreviewModal({
           </div>
         </div>
 
-        {/* Overview (Optional) */}
-        {proposal.summary && (
+        {/* Overview (Only when summary is provided) */}
+        {hasSummary && (
           <div className="prop-section">
-            <div className="prop-section-title">1. Project Overview & Scope of Work</div>
+            <div className="prop-section-title">{summarySecNum}. Project Overview & Scope of Work</div>
             <div className="prop-overview-text">{proposal.summary}</div>
           </div>
         )}
 
         {/* Deliverables Table */}
         <div className="prop-section">
-          <div className="prop-section-title">{proposal.summary ? '2.' : '1.'} Deliverables & Commercial Pricing</div>
+          <div className="prop-section-title">{delivSecNum}. Deliverables & Commercial Pricing</div>
           <table className="prop-table">
             <thead>
               <tr>
@@ -183,10 +193,10 @@ export default function ProposalPreviewModal({
                     <td style={{ textAlign: 'center' }}>{it.qty || 1}</td>
                     <td style={{ textAlign: 'right' }}>{money(it.price || 0, cur)}</td>
                     <td style={{ textAlign: 'right', color: disc > 0 ? '#dc2626' : '#64748b' }}>
-                      {disc > 0 ? `- ${money(disc, cur)}` : '—'}
+                      ${disc > 0 ? `- ${money(disc, cur)}` : '—'}
                     </td>
                     <td style={{ textAlign: 'center', color: taxP > 0 ? '#0369a1' : '#64748b' }}>
-                      {taxP > 0 ? `${taxP}%` : '—'}
+                      ${taxP > 0 ? `${taxP}%` : '—'}
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: '750' }}>
                       {money(lineTot, cur)}
@@ -222,10 +232,10 @@ export default function ProposalPreviewModal({
           </table>
         </div>
 
-        {/* 3. Payment Milestones (Above Terms) */}
-        {proposal.milestones && proposal.milestones.length > 0 && (
+        {/* Payment Milestones (If present) */}
+        {hasMilestones && (
           <div className="prop-section">
-            <div className="prop-section-title">{proposal.summary ? '3.' : '2.'} Payment Milestones & Billing Schedule</div>
+            <div className="prop-section-title">{milestoneSecNum}. Payment Milestones & Billing Schedule</div>
             <table className="prop-table">
               <thead>
                 <tr>
@@ -254,10 +264,10 @@ export default function ProposalPreviewModal({
           </div>
         )}
 
-        {/* 4. Terms & Conditions (Below Milestones) */}
-        {proposal.terms && (
+        {/* Terms & Conditions (If present) */}
+        {hasTerms && (
           <div className="prop-section">
-            <div className="prop-section-title">{(proposal.summary ? 2 : 1) + (proposal.milestones && proposal.milestones.length > 0 ? 2 : 1)}. Payment Terms & Conditions</div>
+            <div className="prop-section-title">{termsSecNum}. Payment Terms & Conditions</div>
             <div className="prop-terms-box">{proposal.terms}</div>
           </div>
         )}

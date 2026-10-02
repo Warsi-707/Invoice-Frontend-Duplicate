@@ -1,18 +1,38 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import StatusBadge from '../components/common/StatusBadge';
-import { calculateClientLedger } from '../utils/ledgerExport';
+import {
+  calculateClientLedger,
+  generateLedgerStatementHtml,
+  exportLedgerToExcel,
+  printLedgerStatement
+} from '../utils/ledgerExport';
+import { downloadAsPdf, sendPdfToWhatsApp } from '../utils/whatsappPdf';
 import { MONTHS, YEARS } from '../utils/formatters';
 
 export default function ClientLedgerPage() {
   const {
     state,
     getBusiness,
-    formatMoney
+    formatMoney,
+    selectedLedgerCustomerId,
+    setSelectedLedgerCustomerId
   } = useApp();
 
   // Selected customer for single ledger view (null = members list)
-  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [selectedCustomerId, setSelectedCustomerIdLocal] = useState(selectedLedgerCustomerId || null);
+
+  // Sync with context-driven navigation (from notification click)
+  useEffect(() => {
+    if (selectedLedgerCustomerId) {
+      setSelectedCustomerIdLocal(selectedLedgerCustomerId);
+      setSelectedLedgerCustomerId(null); // clear so it doesn't re-trigger
+    }
+  }, [selectedLedgerCustomerId, setSelectedLedgerCustomerId]);
+
+  const setSelectedCustomerId = (id) => {
+    setSelectedCustomerIdLocal(id);
+  };
 
   // Search in member list
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +86,61 @@ export default function ClientLedgerPage() {
     });
   }, [selectedCustomer, selectedBusiness, invoicesList, selectedMonth, selectedYear, fromDate, toDate, ledgerSearchQuery]);
 
+  // Export & Print Handlers
+  const handlePrintLedger = () => {
+    if (!selectedCustomer || !selectedBusiness || !currentLedger) return;
+    const html = generateLedgerStatementHtml(selectedCustomer, selectedBusiness, invoicesList, {
+      selectedMonth,
+      selectedYear,
+      fromDate,
+      toDate,
+      searchQuery: ledgerSearchQuery
+    });
+    printLedgerStatement(html);
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!selectedCustomer || !selectedBusiness || !currentLedger) return;
+    const html = generateLedgerStatementHtml(selectedCustomer, selectedBusiness, invoicesList, {
+      selectedMonth,
+      selectedYear,
+      fromDate,
+      toDate,
+      searchQuery: ledgerSearchQuery
+    });
+    const cleanName = (selectedCustomer.name || 'Client').replace(/[^a-zA-Z0-9_-]/g, '_');
+    await downloadAsPdf(html, `Ledger_${cleanName}.pdf`);
+  };
+
+  const handleExportExcel = () => {
+    if (!selectedCustomer || !selectedBusiness || !currentLedger) return;
+    exportLedgerToExcel(selectedCustomer, selectedBusiness, invoicesList, {
+      selectedMonth,
+      selectedYear,
+      fromDate,
+      toDate,
+      searchQuery: ledgerSearchQuery
+    });
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!selectedCustomer || !selectedBusiness || !currentLedger) return;
+    const phone = selectedCustomer.whatsapp || selectedCustomer.phone;
+    if (!phone) {
+      alert('No phone number registered for this client.');
+      return;
+    }
+    const html = generateLedgerStatementHtml(selectedCustomer, selectedBusiness, invoicesList, {
+      selectedMonth,
+      selectedYear,
+      fromDate,
+      toDate,
+      searchQuery: ledgerSearchQuery
+    });
+    const cleanName = (selectedCustomer.name || 'Client').replace(/[^a-zA-Z0-9_-]/g, '_');
+    await sendPdfToWhatsApp(html, phone, `Ledger Statement for ${selectedCustomer.name}`, `Ledger_${cleanName}.pdf`);
+  };
+
   return (
     <section id="client-ledger" className="page active">
       {/* -------------------------------------------------------------
@@ -73,9 +148,14 @@ export default function ClientLedgerPage() {
          ------------------------------------------------------------- */}
       {!selectedCustomerId && (
         <div className="panel">
-          <div className="panel-head">
-            <span>Client Ledger</span>
-            <span>Select a member to view their ledger</span>
+          <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a' }}>Client Financial Ledger</span>
+              <span style={{ fontSize: '11px', color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '2px 8px', borderRadius: '12px', fontWeight: '600' }}>
+                {filteredMembers.length} Members
+              </span>
+            </div>
+            <span style={{ fontSize: '12px', color: '#64748b' }}>Select a member to view their complete financial ledger</span>
           </div>
 
           <div className="panel-body">
@@ -125,7 +205,7 @@ export default function ClientLedgerPage() {
                     <th>Member Name</th>
                     <th>Phone / WhatsApp</th>
                     <th>Business</th>
-                    <th style={{ width: '130px', textAlign: 'center' }}>Action</th>
+                    <th style={{ width: '140px', textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -155,14 +235,30 @@ export default function ClientLedgerPage() {
                             {b?.name || '-'}
                           </td>
 
-                          <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap', width: '130px' }} onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
-                              className="btn sm primary"
-                              style={{ padding: '4px 12px', fontSize: '11.5px', fontWeight: 600 }}
                               onClick={() => setSelectedCustomerId(c?.id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '5px',
+                                padding: '0 12px',
+                                height: '26px',
+                                fontSize: '11px',
+                                fontWeight: 650,
+                                background: '#0284c7',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '9999px',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.15s ease'
+                              }}
                             >
-                              Open Ledger →
+                              <span>Open Ledger</span>
+                              <span style={{ fontSize: '12px' }}>→</span>
                             </button>
                           </td>
                         </tr>
@@ -188,30 +284,118 @@ export default function ClientLedgerPage() {
       {selectedCustomerId && selectedCustomer && currentLedger && (
         <>
           {/* Top Panel: Header & Member Info */}
-          <div className="panel" style={{ marginBottom: '14px' }}>
-            <div className="panel-head">
+          <div className="panel" style={{ marginBottom: '16px' }}>
+            <div className="panel-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
                   type="button"
-                  className="btn sm light"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: '#ffffff',
-                    border: '1px solid rgba(255, 255, 255, 0.35)',
-                    padding: '3px 10px',
-                    fontSize: '11.5px',
-                    fontWeight: 700
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#f1f5f9',
+                    color: '#1e293b',
+                    border: '1px solid #e2e8f0',
+                    padding: '5px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
                   }}
                   onClick={() => setSelectedCustomerId(null)}
                 >
-                  ← Back to List
+                  ← Back to Members
                 </button>
-                <span>
+                <span style={{ fontWeight: '700', fontSize: '16px', color: '#0f172a' }}>
                   {selectedCustomer?.name}
                 </span>
-                <span style={{ fontSize: '11.5px', opacity: 0.85, fontWeight: 500 }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
                   ({selectedBusiness?.name || 'Business'} {selectedCustomer?.phone ? `• ${selectedCustomer.phone}` : ''})
                 </span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handlePrintLedger}
+                  style={{
+                    height: '32px',
+                    padding: '0 12px',
+                    fontSize: '12px',
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  🖨️ Print
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  style={{
+                    height: '32px',
+                    padding: '0 12px',
+                    fontSize: '12px',
+                    background: '#ffffff',
+                    color: '#334155',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  📄 PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  style={{
+                    height: '32px',
+                    padding: '0 12px',
+                    fontSize: '12px',
+                    background: '#ffffff',
+                    color: '#0284c7',
+                    border: '1px solid #bae6fd',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                >
+                  📊 Excel
+                </button>
+                {(selectedCustomer?.whatsapp || selectedCustomer?.phone) && (
+                  <button
+                    type="button"
+                    onClick={handleSendWhatsApp}
+                    style={{
+                      height: '32px',
+                      padding: '0 12px',
+                      fontSize: '12px',
+                      background: '#eaf5ee',
+                      color: '#047857',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    💬 WhatsApp
+                  </button>
+                )}
               </div>
             </div>
 
@@ -304,10 +488,10 @@ export default function ClientLedgerPage() {
           </div>
 
           {/* Simple Clean KPI Cards */}
-          <div className="cards" style={{ marginBottom: '14px' }}>
+          <div className="cards" style={{ marginBottom: '16px' }}>
             <div className="stat">
               <div className="label">Total Invoiced</div>
-              <div className="value">
+              <div className="value" style={{ color: '#0f172a' }}>
                 {formatMoney(currentLedger.totalInvoiced, selectedCustomer?.businessId)}
               </div>
               <div className="hint">Billed charges</div>
@@ -315,7 +499,7 @@ export default function ClientLedgerPage() {
 
             <div className="stat">
               <div className="label">Total Paid</div>
-              <div className="value">
+              <div className="value" style={{ color: '#0284c7' }}>
                 {formatMoney(currentLedger.totalPaid, selectedCustomer?.businessId)}
               </div>
               <div className="hint">Payments received</div>
@@ -323,7 +507,7 @@ export default function ClientLedgerPage() {
 
             <div className="stat">
               <div className="label">Outstanding</div>
-              <div className="value">
+              <div className="value" style={{ color: currentLedger.outstandingBalance > 0 ? '#dc2626' : '#0284c7' }}>
                 {formatMoney(currentLedger.outstandingBalance, selectedCustomer?.businessId)}
               </div>
               <div className="hint">Unpaid balance</div>
@@ -331,14 +515,14 @@ export default function ClientLedgerPage() {
 
             <div className="stat">
               <div className="label">Advance / Credit</div>
-              <div className="value">
+              <div className="value" style={{ color: '#0284c7' }}>
                 {formatMoney(currentLedger.advanceCredit, selectedCustomer?.businessId)}
               </div>
               <div className="hint">Prepaid balance</div>
             </div>
 
             <div className="stat">
-              <div className="label">Invoices</div>
+              <div className="label">Invoices Count</div>
               <div className="value">
                 {currentLedger.invoicesCount || 0}
               </div>
@@ -394,7 +578,27 @@ export default function ClientLedgerPage() {
                         <td>
                           <strong>{r.ref}</strong>
                         </td>
-                        <td>{r.typeLabel}</td>
+                        <td>
+                          {r.typeLabel}
+                          {r.rawInvoice?.milestoneId && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                marginLeft: '6px',
+                                padding: '2px 7px',
+                                borderRadius: '9999px',
+                                verticalAlign: 'middle',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                border: '1px solid #e2e8f0',
+                                fontWeight: 600,
+                                display: 'inline-block'
+                              }}
+                            >
+                              Milestone
+                            </span>
+                          )}
+                        </td>
                         <td>
                           <div>{r.description}</div>
                           {r.monthYear !== '-' && (

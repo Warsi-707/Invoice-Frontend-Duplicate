@@ -19,7 +19,7 @@ export default function Modal({
     >
       <div
         className="modal-box"
-        style={{ width: `min(${maxWidth}, 96vw)` }}
+        style={{ maxWidth: maxWidth, width: '100%' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">

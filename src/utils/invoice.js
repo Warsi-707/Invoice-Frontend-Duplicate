@@ -104,8 +104,7 @@ export function generateInvoiceHtml(invoice = {}, business = {}, customer = {}) 
   <title>${esc(invNo)}</title>
   <style>
     @page {
-      margin: 8mm;
-      size: A4 portrait;
+      margin: 0;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -120,13 +119,15 @@ export function generateInvoiceHtml(invoice = {}, business = {}, customer = {}) 
     .inv-container {
       width: 750px !important;
       max-width: 750px !important;
-      margin: 0 !important;
+      margin: 0 auto !important;
       padding: 24px 28px !important;
       background: #ffffff !important;
       box-sizing: border-box !important;
-      border: 1.5px solid #cbd5e1 !important;
-      border-radius: 10px !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 8px !important;
       color: #1e293b;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     .inv-top-content {
       width: 100%;
@@ -393,25 +394,33 @@ export function generateInvoiceHtml(invoice = {}, business = {}, customer = {}) 
       text-align: center;
       font-size: 9px;
       color: #94a3b8;
-      border-top: 1px solid #f1f5f9;
+      border-top: 1px solid #cbd5e1;
       padding-top: 5px;
     }
 
     @media print {
-      html, body { background: #fff !important; margin: 0 !important; }
+      html, body {
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       .inv-container {
         width: 100% !important;
         max-width: 100% !important;
-        border: 1.5px solid #cbd5e1 !important;
-        border-radius: 10px !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
         box-shadow: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
-      @page { margin: 8mm; }
+      @page { margin: 0; }
     }
   </style>
 </head>
 <body>
-  <div class="inv-container">
+  <div class="inv-container invoice" style="border: 1px solid #cbd5e1 !important; border-radius: 8px !important; box-sizing: border-box !important;">
     <div class="inv-top-content">
       <!-- Top Header -->
       <div class="inv-top">

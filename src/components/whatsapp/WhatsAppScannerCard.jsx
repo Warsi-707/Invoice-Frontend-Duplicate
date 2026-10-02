@@ -488,7 +488,7 @@ export default function WhatsAppScannerCard({ isStandalone = false, compact = fa
               <button
                 type="submit"
                 className="btn btn-primary"
-                style={{ fontSize: '12.5px', padding: '7px 16px', background: '#0b4b8f', borderColor: '#0b4b8f' }}
+                style={{ fontSize: '12.5px', padding: '7px 16px', background: '#059669', borderColor: '#059669', borderRadius: '8px', color: '#ffffff', fontWeight: 600 }}
               >
                 💾 Save Timing Settings
               </button>
