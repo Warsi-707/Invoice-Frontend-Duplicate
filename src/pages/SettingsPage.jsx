@@ -386,35 +386,6 @@ export default function SettingsPage() {
 
   return (
     <section id="settings" className="page active">
-      {/* Settings Module Navigation Segmented Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {[
-          { id: 'org', label: 'Organization & Admin' }
-        ].map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSettingsTab(tab.id)}
-              style={{
-                padding: '6px 16px',
-                fontSize: '12.5px',
-                fontWeight: isActive ? '700' : '500',
-                borderRadius: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                border: isActive ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
-                background: isActive ? '#f0f9ff' : '#ffffff',
-                color: isActive ? '#0284c7' : '#475569',
-                boxShadow: 'none'
-              }}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
 
       {/* Dynamic Header for Selected Module */}
       <div className="settings-header-top" style={{ marginBottom: '20px' }}>
