@@ -145,46 +145,35 @@ export default function Sidebar() {
 
   return (
     <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-      {/* Brand Header */}
-      <div className="brand">
+      {/* Brand Header - Clicking Logo / Brand toggles sidebar collapse */}
+      <div
+        className="brand"
+        onClick={toggleSidebarCollapsed}
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        title={isSidebarCollapsed ? "Click to expand sidebar" : "Click to collapse sidebar"}
+      >
         {!isSidebarCollapsed ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-              <div className="mark" title="Invoice Pro" style={{ flexShrink: 0 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10 9 9 9 8 9" />
-                </svg>
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <h1>Invoice Pro</h1>
-                <p>Multi-Business Billing</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="sidebar-collapse-btn"
-              onClick={toggleSidebarCollapsed}
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M9 3v18" />
-                <path d="m15 9-3 3 3 3" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+            <div className="mark" title="Invoice Pro" style={{ flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
               </svg>
-            </button>
-          </>
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h1>Invoice Pro</h1>
+              <p>Multi-Business Billing</p>
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
             <div
               className="mark"
               title="Invoice Pro - Click to expand"
-              style={{ flexShrink: 0, cursor: 'pointer' }}
-              onClick={toggleSidebarCollapsed}
+              style={{ flexShrink: 0 }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -194,19 +183,6 @@ export default function Sidebar() {
                 <polyline points="10 9 9 9 8 9" />
               </svg>
             </div>
-            <button
-              type="button"
-              className="sidebar-collapse-btn"
-              onClick={toggleSidebarCollapsed}
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M9 3v18" />
-                <path d="m13 9 3 3-3 3" />
-              </svg>
-            </button>
           </div>
         )}
       </div>
