@@ -679,7 +679,7 @@ export function AppProvider({ children }) {
   }, [createInvoice, state.settings?.currency]);
 
   // Payments & Reversals Actions
-  const markInvoicePaid = useCallback((invoiceId) => {
+  const markInvoicePaid = useCallback((invoiceId, paymentData = {}) => {
     let updatedInvoice = null;
 
     setState((prev) => {
@@ -703,8 +703,8 @@ export function AppProvider({ children }) {
       const payment = {
         id: uid('p'),
         amount: inv.balance,
-        method: 'Cash',
-        date: today(),
+        method: paymentData.method || 'Cash',
+        date: paymentData.date || today(),
         time: nowTime,
         receivedBy,
         title: itemTitle,
@@ -732,7 +732,9 @@ export function AppProvider({ children }) {
 
     // Background sync to backend
     invoiceApi.markPaid(invoiceId, {
-      receivedBy: state.session?.username || state.settings?.admin || 'Admin'
+      receivedBy: state.session?.username || state.settings?.admin || 'Admin',
+      method: paymentData.method || 'Cash',
+      date: paymentData.date || today()
     }).catch((err) => console.error('API Error marking paid:', err));
 
     showToast('Invoice Paid — download complete.');

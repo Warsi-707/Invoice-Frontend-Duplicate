@@ -78,13 +78,15 @@ export default function SettingsPage() {
   const [showA4Preview, setShowA4Preview] = useState(true);
   const [showInvoicePreview, setShowInvoicePreview] = useState(true);
 
-  // Tab 03: Invoice Settings State
+  // Tab 03: Invoice & Online Banking State
+  const savedBank = state.settings?.bankDetails || {};
   const [currency, setCurrency] = useState(state.settings?.currency || 'PKR');
   const [dueDays, setDueDays] = useState(state.settings?.dueDays ?? 0);
   const [footerNote, setFooterNote] = useState(state.settings?.footerNote || 'Thank you for your business.');
-  const [bankName, setBankName] = useState(savedProp.bankName || '');
-  const [accountTitle, setAccountTitle] = useState(savedProp.accountTitle || '');
-  const [accountIban, setAccountIban] = useState(savedProp.accountIban || '');
+  const [bankName, setBankName] = useState(savedBank.bankName || savedProp.bankName || '');
+  const [accountTitle, setAccountTitle] = useState(savedBank.accountTitle || savedProp.accountTitle || '');
+  const [accountIban, setAccountIban] = useState(savedBank.accountIban || savedProp.accountIban || '');
+  const [branchCode, setBranchCode] = useState(savedBank.branchCode || savedProp.branchCode || '');
   const [invoicePrefix, setInvoicePrefix] = useState(savedProp.invoicePrefix || 'INV-');
 
   // Proposal Dynamic Form Preview State
@@ -171,7 +173,16 @@ export default function SettingsPage() {
       if (p.bankName !== undefined) setBankName(p.bankName);
       if (p.accountTitle !== undefined) setAccountTitle(p.accountTitle);
       if (p.accountIban !== undefined) setAccountIban(p.accountIban);
+      if (p.branchCode !== undefined) setBranchCode(p.branchCode);
       if (p.invoicePrefix !== undefined) setInvoicePrefix(p.invoicePrefix);
+    }
+
+    const b = state.settings?.bankDetails;
+    if (b) {
+      if (b.bankName !== undefined) setBankName(b.bankName);
+      if (b.accountTitle !== undefined) setAccountTitle(b.accountTitle);
+      if (b.accountIban !== undefined) setAccountIban(b.accountIban);
+      if (b.branchCode !== undefined) setBranchCode(b.branchCode);
     }
 
     if (state.settings?.services && Array.isArray(state.settings.services)) {
@@ -198,6 +209,7 @@ export default function SettingsPage() {
       bankName: bankName.trim(),
       accountTitle: accountTitle.trim(),
       accountIban: accountIban.trim(),
+      branchCode: branchCode.trim(),
       invoicePrefix: invoicePrefix.trim() || 'INV-'
     };
 
@@ -208,11 +220,51 @@ export default function SettingsPage() {
       dueDays: Math.max(0, Number(dueDays || 0)),
       footerNote: footerNote.trim(),
       proposalData: proposalDataPayload,
+      bankDetails: {
+        bankName: bankName.trim(),
+        accountTitle: accountTitle.trim(),
+        accountIban: accountIban.trim(),
+        branchCode: branchCode.trim()
+      },
       whatsappSettings: state.settings?.whatsappSettings || { initialDelay: 2, messageDelay: 3 },
       services: servicesList
     });
 
     showToast('✅ Settings saved successfully.');
+  };
+
+  const handleSaveBankSettings = async (e) => {
+    e?.preventDefault();
+    const cleanBank = bankName.trim();
+    const cleanTitle = accountTitle.trim();
+    const cleanIban = accountIban.trim();
+    const cleanBranch = branchCode.trim();
+
+    if (!cleanBank && !cleanTitle && !cleanIban) {
+      showToast('⚠️ Please enter Bank Name and Account Title.');
+      return;
+    }
+
+    const updatedProposalData = {
+      ...(state.settings?.proposalData || {}),
+      bankName: cleanBank,
+      accountTitle: cleanTitle,
+      accountIban: cleanIban,
+      branchCode: cleanBranch
+    };
+
+    await updateSettings({
+      ...state.settings,
+      proposalData: updatedProposalData,
+      bankDetails: {
+        bankName: cleanBank,
+        accountTitle: cleanTitle,
+        accountIban: cleanIban,
+        branchCode: cleanBranch
+      }
+    });
+
+    showToast('✅ Online Banking Details successfully saved!');
   };
 
   // Service Catalog Actions
@@ -516,6 +568,124 @@ export default function SettingsPage() {
               <div className="full settings-save">
                 <Button variant="primary" type="submit">
                   Save Security Settings
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* Left Column Card 2: Online Banking & Payment Details */}
+          <div className="settings-card" style={{ marginTop: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div>
+                <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="3" y1="21" x2="21" y2="21" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                    <polyline points="5 6 12 3 19 6" />
+                    <line x1="4" y1="10" x2="4" y2="21" />
+                    <line x1="20" y1="10" x2="20" y2="21" />
+                    <line x1="8" y1="14" x2="8" y2="17" />
+                    <line x1="12" y1="14" x2="12" y2="17" />
+                    <line x1="16" y1="14" x2="16" y2="17" />
+                  </svg>
+                  <span>Online Banking &amp; Payment Accounts</span>
+                </h4>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
+                  Configure your receiving bank accounts for Full &amp; Partial payment collection.
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveBankSettings} className="settings-form-grid enter-flow" autoComplete="off">
+              <div>
+                <label>
+                  Bank / Wallet Name <span className="req">*</span>
+                </label>
+                <input
+                  id="sBankName"
+                  className="input"
+                  placeholder="e.g. Meezan Bank, HBL, EasyPaisa, JazzCash"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div>
+                <label>
+                  Account Title <span className="req">*</span>
+                </label>
+                <input
+                  id="sAccTitle"
+                  className="input"
+                  placeholder="e.g. Warsi Business Solutions"
+                  value={accountTitle}
+                  onChange={(e) => setAccountTitle(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="full">
+                <label>
+                  Account Number / IBAN <span className="req">*</span>
+                </label>
+                <input
+                  id="sAccIban"
+                  className="input"
+                  placeholder="e.g. PK36MEZN00012345678901 or 03218246707"
+                  value={accountIban}
+                  onChange={(e) => setAccountIban(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="full">
+                <label>Branch Code / Remarks (Optional)</label>
+                <input
+                  id="sBranchCode"
+                  className="input"
+                  placeholder="e.g. Clifton Branch (0102) / Send screenshot on WhatsApp"
+                  value={branchCode}
+                  onChange={(e) => setBranchCode(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              {/* Verified Banking Preview Card */}
+              {(bankName || accountTitle || accountIban) && (
+                <div className="full" style={{
+                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  color: '#ffffff',
+                  padding: '16px 18px',
+                  borderRadius: '12px',
+                  border: '1px solid #334155',
+                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8', fontWeight: 600 }}>
+                      Verified Online Banking Account
+                    </span>
+                    <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#38bdf8' }}>
+                      {bankName || 'Bank'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.4px' }}>
+                    {accountTitle || 'Account Title'}
+                  </div>
+                  <div style={{ fontSize: '13.5px', fontFamily: 'monospace', color: '#cbd5e1', marginTop: '4px' }}>
+                    {accountIban || 'Account / IBAN Number'}
+                  </div>
+                  {branchCode && (
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+                      {branchCode}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="full settings-save">
+                <Button variant="primary" type="submit">
+                  Save Banking Details
                 </Button>
               </div>
             </form>

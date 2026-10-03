@@ -104,6 +104,7 @@ export default function InvoiceCollectionPage() {
 
   // Payment Modal State
   const [payingInvoice, setPayingInvoice] = useState(null);
+  const [paymentMode, setPaymentMode] = useState('partial'); // 'full' | 'partial'
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   // Close dropdown on outside click
@@ -117,8 +118,16 @@ export default function InvoiceCollectionPage() {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  const handleOpenFullPay = (invoice) => {
+    setActiveDropdown(null);
+    setPaymentMode('full');
+    setPayingInvoice(invoice);
+    setIsPaymentModalOpen(true);
+  };
+
   const handleOpenPartialPay = (invoice) => {
     setActiveDropdown(null);
+    setPaymentMode('partial');
     setPayingInvoice(invoice);
     setIsPaymentModalOpen(true);
   };
@@ -128,7 +137,9 @@ export default function InvoiceCollectionPage() {
     const fileName = `${inv.invoiceNo || 'invoice'}.pdf`;
     const phone = c?.whatsapp || c?.phone;
     const orgBrand = state.settings?.proposalData?.companyName || state.settings?.companyName || 'iSysware';
-    const statusNote = inv.status === 'Paid' ? '✅ Full Payment Received' : `💵 Partial Payment Received`;
+    const latestPay = (inv.payments && inv.payments[inv.payments.length - 1]) || {};
+    const methodLabel = latestPay.method ? ` via ${latestPay.method}` : '';
+    const statusNote = inv.status === 'Paid' ? `✅ Full Payment Received${methodLabel}` : `💵 Partial Payment Received${methodLabel}`;
     const caption = `📄 *Invoice ${inv.invoiceNo}*\n🏢 ${orgBrand}\n👤 ${c?.name || 'Client'}\n📌 ${statusNote}\n💰 Balance: ${formatMoney(inv.balance, inv.businessId)}`;
 
     await downloadAndSendWhatsApp({
@@ -141,22 +152,18 @@ export default function InvoiceCollectionPage() {
     showToast('✅ Invoice PDF downloaded!');
   };
 
-  const handleTakePartialPayment = async (invoiceId, paymentData) => {
-    const updated = takePartialPayment(invoiceId, paymentData);
+  const handlePaymentSubmit = async (invoiceId, paymentData) => {
+    let updated;
+    if (paymentData.mode === 'full') {
+      updated = markInvoicePaid(invoiceId, paymentData);
+    } else {
+      updated = takePartialPayment(invoiceId, paymentData);
+    }
     if (updated) {
       const b = getBusiness(updated.businessId);
       const c = getCustomer(updated.customerId);
       await autoDownloadAndWhatsApp(updated, b, c);
     }
-  };
-
-  const handleMarkPaid = async (invoice) => {
-    setActiveDropdown(null);
-    const updated = markInvoicePaid(invoice.id);
-    const b = getBusiness(invoice.businessId);
-    const c = getCustomer(invoice.customerId);
-    const targetInv = updated || { ...invoice, paid: invoice.total, balance: 0, status: 'Paid' };
-    await autoDownloadAndWhatsApp(targetInv, b, c);
   };
 
   const handleReversal = (invoice) => {
@@ -624,7 +631,7 @@ export default function InvoiceCollectionPage() {
                               <button
                                 type="button"
                                 className="dropdown-item"
-                                onClick={() => handleMarkPaid(inv)}
+                                onClick={() => handleOpenFullPay(inv)}
                               >
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                                 <span>Full Payment</span>
@@ -999,14 +1006,15 @@ export default function InvoiceCollectionPage() {
         </div>
       )}
 
-      {/* Partial Payment Modal */}
+      {/* Payment Modal (Full & Partial with Online Bank Details) */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         invoice={payingInvoice}
         business={getBusiness(payingInvoice?.businessId)}
         customer={getCustomer(payingInvoice?.customerId)}
-        onSubmit={handleTakePartialPayment}
+        mode={paymentMode}
+        onSubmit={handlePaymentSubmit}
       />
     </section>
   );
