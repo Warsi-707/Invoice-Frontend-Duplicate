@@ -84,8 +84,12 @@ export default function PaymentModal({
     // Determine final method description
     let finalMethod = method;
     if (method === 'Online') {
+      if (!trxRef.trim()) {
+        alert('Online payment ke liye Transaction / Ref ID lazmi hai.');
+        return;
+      }
       const bankLabel = activeBankName ? `Online - ${activeBankName}` : 'Online Bank Transfer';
-      finalMethod = trxRef.trim() ? `${bankLabel} (Ref: ${trxRef.trim()})` : bankLabel;
+      finalMethod = `${bankLabel} (Ref: ${trxRef.trim()})`;
     }
 
     onSubmit(invoice.id, {
@@ -261,8 +265,8 @@ export default function PaymentModal({
               )}
 
               <div style={{ marginTop: '10px' }}>
-                <label style={{ fontSize: '11.5px', color: '#0369a1', fontWeight: 600 }}>
-                  Online Transaction / Ref ID (Optional)
+                <label style={{ fontSize: '11.5px', color: '#0369a1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  Online Transaction / Ref ID <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <input
                   className="input"
@@ -270,6 +274,7 @@ export default function PaymentModal({
                   placeholder="e.g. TID-9847234 or Meezan Transfer # 8721"
                   value={trxRef}
                   onChange={(e) => setTrxRef(e.target.value)}
+                  required={method === 'Online'}
                   autoComplete="off"
                 />
               </div>
