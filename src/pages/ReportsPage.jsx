@@ -233,34 +233,6 @@ export default function ReportsPage() {
         </div>
 
         <div className="panel-body">
-          {/* Submodule Navigation Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-            <button
-              type="button"
-              className={`btn btn-sm ${currentTab === 'collections' ? 'btn-primary' : 'btn-light'}`}
-              onClick={() => setReportsTab('collections')}
-              style={{ fontWeight: 600 }}
-            >
-              Invoice Collection ({allPayments.length})
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${currentTab === 'paid' ? 'btn-primary' : 'btn-light'}`}
-              onClick={() => setReportsTab('paid')}
-              style={{ fontWeight: 600 }}
-            >
-              Paid Invoices ({paidInvoices.length})
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${currentTab === 'unpaid' ? 'btn-primary' : 'btn-light'}`}
-              onClick={() => setReportsTab('unpaid')}
-              style={{ fontWeight: 600 }}
-            >
-              Unpaid Invoices ({unpaidInvoices.length})
-            </button>
-          </div>
-
           {/* Filters Toolbar */}
           <div className="toolbar enter-flow" style={{ marginBottom: '16px' }}>
             <div className="sm">
