@@ -389,10 +389,7 @@ export default function SettingsPage() {
       {/* Settings Module Navigation Segmented Tabs */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {[
-          { id: 'org', label: 'Organization & Admin' },
-          { id: 'proposal', label: 'Proposal & Letterhead' },
-          { id: 'invoice', label: 'Invoice Settings' },
-          { id: 'services', label: 'Services Catalog' }
+          { id: 'org', label: 'Organization & Admin' }
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           return (
