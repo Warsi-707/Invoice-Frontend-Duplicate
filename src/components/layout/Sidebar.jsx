@@ -7,15 +7,21 @@ export default function Sidebar() {
     setCurrentPage,
     settingsTab,
     setSettingsTab,
+    reportsTab,
+    setReportsTab,
     logout,
     isSidebarCollapsed,
     toggleSidebarCollapsed
   } = useApp();
   const [isSettingsOpen, setIsSettingsOpen] = useState(currentPage === 'settings');
+  const [isReportsOpen, setIsReportsOpen] = useState(currentPage === 'reports');
 
   useEffect(() => {
     if (currentPage === 'settings') {
       setIsSettingsOpen(true);
+    }
+    if (currentPage === 'reports') {
+      setIsReportsOpen(true);
     }
   }, [currentPage]);
 
@@ -88,19 +94,28 @@ export default function Sidebar() {
           <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
         </svg>
       )
-    },
-    {
-      id: 'reports',
-      label: 'Reports',
-      icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg>
-      )
     }
   ];
+
+  const handleReportsMainClick = () => {
+    if (isSidebarCollapsed) {
+      setCurrentPage('reports');
+      setReportsTab(reportsTab || 'collections');
+      return;
+    }
+    if (currentPage !== 'reports') {
+      setCurrentPage('reports');
+      setIsReportsOpen(true);
+    } else {
+      setIsReportsOpen(!isReportsOpen);
+    }
+  };
+
+  const handleReportsSubTabClick = (tabKey) => {
+    setReportsTab(tabKey);
+    setCurrentPage('reports');
+    setIsReportsOpen(true);
+  };
 
   const handleSettingsMainClick = () => {
     if (isSidebarCollapsed) {
@@ -213,6 +228,63 @@ export default function Sidebar() {
             </button>
           );
         })}
+
+        {/* Reports Dropdown Module */}
+        <div className="nav-dropdown-group">
+          <button
+            type="button"
+            className={`nav-parent-btn ${currentPage === 'reports' ? 'active' : ''}`}
+            onClick={handleReportsMainClick}
+            title="Reports"
+          >
+            <span className="nav-icon-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </span>
+            {!isSidebarCollapsed && (
+              <>
+                <span style={{ flex: 1, textAlign: 'left' }}>Reports</span>
+                <span className={`nav-arrow ${isReportsOpen ? 'open' : ''}`}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </span>
+              </>
+            )}
+          </button>
+
+          {/* Sub-Modules: Invoice Collection, Paid Invoices, Unpaid Invoices */}
+          {!isSidebarCollapsed && isReportsOpen && (
+            <div className="nav-submenu">
+              <button
+                type="button"
+                className={`nav-sub-item ${currentPage === 'reports' && (reportsTab === 'collections' || !reportsTab) ? 'active' : ''}`}
+                onClick={() => handleReportsSubTabClick('collections')}
+              >
+                <span>Invoice Collection</span>
+              </button>
+
+              <button
+                type="button"
+                className={`nav-sub-item ${currentPage === 'reports' && reportsTab === 'paid' ? 'active' : ''}`}
+                onClick={() => handleReportsSubTabClick('paid')}
+              >
+                <span>Paid Invoices</span>
+              </button>
+
+              <button
+                type="button"
+                className={`nav-sub-item ${currentPage === 'reports' && reportsTab === 'unpaid' ? 'active' : ''}`}
+                onClick={() => handleReportsSubTabClick('unpaid')}
+              >
+                <span>Unpaid Invoices</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* General / Settings Section */}
         {!isSidebarCollapsed ? (

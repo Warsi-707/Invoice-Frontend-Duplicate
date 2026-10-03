@@ -37,10 +37,22 @@ const getInitialSettingsTab = () => {
   return 'org';
 };
 
+const getInitialReportsTab = () => {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const rTabParam = params.get('rtab');
+    if (rTabParam) return rTabParam;
+    const saved = localStorage.getItem('invoice_manager_reports_tab');
+    if (saved) return saved;
+  }
+  return 'collections';
+};
+
 export function AppProvider({ children }) {
   const [state, setState] = useState(() => loadStoredState());
   const [currentPage, setCurrentPageInternal] = useState(getInitialPage);
   const [settingsTab, setSettingsTabInternal] = useState(getInitialSettingsTab);
+  const [reportsTab, setReportsTabInternal] = useState(getInitialReportsTab);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -83,6 +95,16 @@ export function AppProvider({ children }) {
       localStorage.setItem('invoice_manager_settings_tab', tab);
       const url = new URL(window.location.href);
       url.searchParams.set('tab', tab);
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {}
+  }, []);
+
+  const setReportsTab = useCallback((tab) => {
+    setReportsTabInternal(tab);
+    try {
+      localStorage.setItem('invoice_manager_reports_tab', tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set('rtab', tab);
       window.history.replaceState({}, '', url.toString());
     } catch (e) {}
   }, []);
@@ -986,6 +1008,8 @@ export function AppProvider({ children }) {
     setCurrentPage,
     settingsTab,
     setSettingsTab,
+    reportsTab,
+    setReportsTab,
     isAdminModalOpen,
     setIsAdminModalOpen,
     previewInvoice,
