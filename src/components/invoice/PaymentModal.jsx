@@ -167,8 +167,8 @@ export default function PaymentModal({
               onChange={(e) => setMethod(e.target.value)}
               style={{ fontWeight: 600 }}
             >
-              <option value="Cash">💵 Cash in Hand</option>
-              <option value="Online">🏦 Online / Bank Transfer</option>
+              <option value="Cash">Cash</option>
+              <option value="Online">Online / Bank Transfer</option>
             </select>
           </div>
 
@@ -203,8 +203,8 @@ export default function PaymentModal({
               marginTop: '4px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0369a1', fontWeight: 700, fontSize: '13px' }}>
-                  <span>🏦</span> Deposit Bank Account
+                <div style={{ color: '#0369a1', fontWeight: 700, fontSize: '13px' }}>
+                  Deposit Bank Account
                 </div>
                 {activeBankName && (
                   <span style={{ fontSize: '11px', background: '#bae6fd', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>

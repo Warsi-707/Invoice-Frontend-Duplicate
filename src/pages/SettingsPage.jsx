@@ -975,7 +975,6 @@ export default function SettingsPage() {
                   borderRadius: '10px',
                   border: '1px dashed #cbd5e1'
                 }}>
-                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>🏦</div>
                   <div style={{ fontWeight: 600, color: '#475569', fontSize: '14px' }}>No bank accounts added yet</div>
                   <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
                     Use the form on the left to add your first bank account.
@@ -999,7 +998,6 @@ export default function SettingsPage() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '18px' }}>🏦</span>
                             <div>
                               <strong style={{ fontSize: '14px', color: '#0f172a' }}>{acc.bankName}</strong>
                               {isDefault && (
