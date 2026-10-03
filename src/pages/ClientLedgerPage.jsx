@@ -50,15 +50,29 @@ export default function ClientLedgerPage() {
   // Filtered members list
   const filteredMembers = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
+    if (!q) return customersList;
+
+    const matchesPrefix = (text, query) => {
+      if (!text || !query) return false;
+      const str = String(text).trim().toLowerCase();
+      if (str.startsWith(query)) return true;
+      const words = str.split(/[\s\-_/.]+/);
+      return words.some((w) => w.startsWith(query));
+    };
+
+    const qClean = q.replace(/\D/g, '');
+
     return customersList.filter((c) => {
-      if (!q) return true;
       const b = getBusiness(c?.businessId);
+      const phoneClean = (c?.phone || '').replace(/\D/g, '');
+      const waClean = (c?.whatsapp || '').replace(/\D/g, '');
+      const matchPhone = qClean && (phoneClean.startsWith(qClean) || waClean.startsWith(qClean));
+
       return (
-        (c?.name && c.name.toLowerCase().includes(q)) ||
-        (c?.phone && c.phone.toLowerCase().includes(q)) ||
-        (c?.whatsapp && c.whatsapp.toLowerCase().includes(q)) ||
-        (b?.name && b.name.toLowerCase().includes(q)) ||
-        (c?.address && c.address.toLowerCase().includes(q))
+        matchesPrefix(c?.name, q) ||
+        matchesPrefix(c?.company, q) ||
+        matchesPrefix(b?.name, q) ||
+        matchPhone
       );
     });
   }, [customersList, searchTerm, getBusiness]);

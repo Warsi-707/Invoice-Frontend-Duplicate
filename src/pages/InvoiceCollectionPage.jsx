@@ -261,18 +261,38 @@ export default function InvoiceCollectionPage() {
   const query = searchTerm.trim().toLowerCase();
   const hasFilter = Boolean(query);
 
+  // Prefix matching helper: checks if string starts with query OR any individual word starts with query
+  const matchesPrefix = (text, q) => {
+    if (!text || !q) return false;
+    const str = String(text).trim().toLowerCase();
+    if (str.startsWith(q)) return true;
+    const words = str.split(/[\s\-_/.]+/);
+    return words.some((w) => w.startsWith(q));
+  };
+
   // Filtered invoices: only populate when user searches, otherwise empty by default
   const filteredInvoices = query
     ? state.invoices.filter((inv) => {
         const c = getCustomer(inv.customerId);
         const b = getBusiness(inv.businessId);
-        const searchString = `${inv.invoiceNo} ${c?.name || ''} ${b?.name || ''} ${c?.phone || ''} ${c?.whatsapp || ''}`.toLowerCase();
 
-        const matchesSearch = searchString.includes(query);
-        const matchesBusiness = !businessFilter || inv.businessId === businessFilter;
-        const matchesStatus = !statusFilter || inv.status === statusFilter;
+        // Strict prefix-start matching on client name, company, invoice number, and business
+        const matchClient = matchesPrefix(c?.name, query);
+        const matchCompany = matchesPrefix(c?.company, query);
+        const matchInvoiceNo = matchesPrefix(inv.invoiceNo, query);
+        const matchBusiness = matchesPrefix(b?.name, query);
 
-        return matchesSearch && matchesBusiness && matchesStatus;
+        // Phone / WhatsApp prefix match
+        const phoneClean = (c?.phone || '').replace(/\D/g, '');
+        const waClean = (c?.whatsapp || '').replace(/\D/g, '');
+        const qClean = query.replace(/\D/g, '');
+        const matchPhone = qClean && (phoneClean.startsWith(qClean) || waClean.startsWith(qClean));
+
+        const matchesSearch = matchClient || matchCompany || matchInvoiceNo || matchBusiness || matchPhone;
+        const matchesBusinessFilter = !businessFilter || inv.businessId === businessFilter;
+        const matchesStatusFilter = !statusFilter || inv.status === statusFilter;
+
+        return matchesSearch && matchesBusinessFilter && matchesStatusFilter;
       })
     : [];
 

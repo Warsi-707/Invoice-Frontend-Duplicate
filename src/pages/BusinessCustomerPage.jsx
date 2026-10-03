@@ -379,8 +379,26 @@ export default function BusinessCustomerPage() {
       };
     })
     .filter(({ customer: c, business: b }) => {
-      const fullStr = `${b.name || ''} ${b.category || ''} ${c.phone || ''} ${c.whatsapp || ''} ${c.name || ''} ${b.address || ''}`.toLowerCase();
-      return fullStr.includes(query);
+      if (!query) return true;
+      const matchesPrefix = (text, q) => {
+        if (!text || !q) return false;
+        const str = String(text).trim().toLowerCase();
+        if (str.startsWith(q)) return true;
+        const words = str.split(/[\s\-_/.]+/);
+        return words.some((w) => w.startsWith(q));
+      };
+
+      const phoneClean = (c?.phone || '').replace(/\D/g, '');
+      const waClean = (c?.whatsapp || '').replace(/\D/g, '');
+      const qClean = query.replace(/\D/g, '');
+      const matchPhone = qClean && (phoneClean.startsWith(qClean) || waClean.startsWith(qClean));
+
+      return (
+        matchesPrefix(c?.name, query) ||
+        matchesPrefix(b?.name, query) ||
+        matchesPrefix(b?.category, query) ||
+        matchPhone
+      );
     });
 
   return (
