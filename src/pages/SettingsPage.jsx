@@ -43,7 +43,7 @@ export default function SettingsPage() {
   } = useApp();
 
   const fileInputRef = useRef(null);
-  const activeTab = settingsTab === 'proposal' ? 'proposal' : settingsTab === 'invoice' ? 'invoice' : settingsTab === 'services' ? 'services' : 'org';
+  const activeTab = settingsTab === 'banking' ? 'banking' : settingsTab === 'proposal' ? 'proposal' : settingsTab === 'invoice' ? 'invoice' : settingsTab === 'services' ? 'services' : 'org';
 
   // Services Catalog State
   const [servicesList, setServicesList] = useState(
@@ -88,6 +88,34 @@ export default function SettingsPage() {
   const [accountIban, setAccountIban] = useState(savedBank.accountIban || savedProp.accountIban || '');
   const [branchCode, setBranchCode] = useState(savedBank.branchCode || savedProp.branchCode || '');
   const [invoicePrefix, setInvoicePrefix] = useState(savedProp.invoicePrefix || 'INV-');
+
+  // Multi-Bank Accounts State for Dedicated Module
+  const initialBankAccounts = Array.isArray(state.settings?.bankAccounts) && state.settings.bankAccounts.length > 0
+    ? state.settings.bankAccounts
+    : (savedBank.bankName || savedProp.bankName)
+      ? [{
+          id: 'bank-init-1',
+          bankName: savedBank.bankName || savedProp.bankName || 'Meezan Bank',
+          accountTitle: savedBank.accountTitle || savedProp.accountTitle || 'iSysware Software Solution',
+          accountIban: savedBank.accountIban || savedProp.accountIban || 'PK346MEZN88904',
+          branchCode: savedBank.branchCode || savedProp.branchCode || '',
+          isDefault: true
+        }]
+      : [];
+
+  const [bankAccounts, setBankAccounts] = useState(initialBankAccounts);
+  const [editingBankId, setEditingBankId] = useState(null);
+  const [formBankName, setFormBankName] = useState('');
+  const [formAccountTitle, setFormAccountTitle] = useState('');
+  const [formAccountIban, setFormAccountIban] = useState('');
+  const [formBranchCode, setFormBranchCode] = useState('');
+  const [formIsDefault, setFormIsDefault] = useState(false);
+
+  useEffect(() => {
+    if (Array.isArray(state.settings?.bankAccounts) && state.settings.bankAccounts.length > 0) {
+      setBankAccounts(state.settings.bankAccounts);
+    }
+  }, [state.settings?.bankAccounts]);
 
   // Proposal Dynamic Form Preview State
   const [propTitle, setPropTitle] = useState('');
@@ -233,38 +261,159 @@ export default function SettingsPage() {
     showToast('✅ Settings saved successfully.');
   };
 
-  const handleSaveBankSettings = async (e) => {
+  const handleSaveBankAccount = async (e) => {
     e?.preventDefault();
-    const cleanBank = bankName.trim();
-    const cleanTitle = accountTitle.trim();
-    const cleanIban = accountIban.trim();
-    const cleanBranch = branchCode.trim();
+    const cleanBank = formBankName.trim();
+    const cleanTitle = formAccountTitle.trim();
+    const cleanIban = formAccountIban.trim();
+    const cleanBranch = formBranchCode.trim();
 
-    if (!cleanBank && !cleanTitle && !cleanIban) {
-      showToast('⚠️ Please enter Bank Name and Account Title.');
+    if (!cleanBank || !cleanTitle || !cleanIban) {
+      showToast('⚠️ Please enter Bank Name, Account Title, and Account / IBAN.');
       return;
     }
 
-    const updatedProposalData = {
-      ...(state.settings?.proposalData || {}),
-      bankName: cleanBank,
-      accountTitle: cleanTitle,
-      accountIban: cleanIban,
-      branchCode: cleanBranch
-    };
-
-    await updateSettings({
-      ...state.settings,
-      proposalData: updatedProposalData,
-      bankDetails: {
+    let updatedList;
+    if (editingBankId) {
+      updatedList = bankAccounts.map((acc) => {
+        if (acc.id === editingBankId) {
+          return {
+            ...acc,
+            bankName: cleanBank,
+            accountTitle: cleanTitle,
+            accountIban: cleanIban,
+            branchCode: cleanBranch,
+            isDefault: formIsDefault
+          };
+        }
+        return formIsDefault ? { ...acc, isDefault: false } : acc;
+      });
+    } else {
+      const newAcc = {
+        id: `bank-${Date.now()}`,
         bankName: cleanBank,
         accountTitle: cleanTitle,
         accountIban: cleanIban,
-        branchCode: cleanBranch
+        branchCode: cleanBranch,
+        isDefault: formIsDefault || bankAccounts.length === 0
+      };
+      if (newAcc.isDefault) {
+        updatedList = [...bankAccounts.map((a) => ({ ...a, isDefault: false })), newAcc];
+      } else {
+        updatedList = [...bankAccounts, newAcc];
+      }
+    }
+
+    if (!updatedList.some((a) => a.isDefault) && updatedList.length > 0) {
+      updatedList[0].isDefault = true;
+    }
+
+    const defaultAcc = updatedList.find((a) => a.isDefault) || updatedList[0];
+
+    await updateSettings({
+      ...state.settings,
+      bankAccounts: updatedList,
+      bankDetails: defaultAcc ? {
+        bankName: defaultAcc.bankName,
+        accountTitle: defaultAcc.accountTitle,
+        accountIban: defaultAcc.accountIban,
+        branchCode: defaultAcc.branchCode
+      } : {},
+      proposalData: {
+        ...(state.settings?.proposalData || {}),
+        bankName: defaultAcc?.bankName || '',
+        accountTitle: defaultAcc?.accountTitle || '',
+        accountIban: defaultAcc?.accountIban || '',
+        branchCode: defaultAcc?.branchCode || ''
       }
     });
 
-    showToast('✅ Online Banking Details successfully saved!');
+    setBankAccounts(updatedList);
+    setEditingBankId(null);
+    setFormBankName('');
+    setFormAccountTitle('');
+    setFormAccountIban('');
+    setFormBranchCode('');
+    setFormIsDefault(false);
+    showToast(editingBankId ? '✅ Bank account updated successfully!' : '✅ Bank account added successfully!');
+  };
+
+  const handleEditBankAccount = (acc) => {
+    setEditingBankId(acc.id);
+    setFormBankName(acc.bankName || '');
+    setFormAccountTitle(acc.accountTitle || '');
+    setFormAccountIban(acc.accountIban || '');
+    setFormBranchCode(acc.branchCode || '');
+    setFormIsDefault(Boolean(acc.isDefault));
+  };
+
+  const handleCancelBankEdit = () => {
+    setEditingBankId(null);
+    setFormBankName('');
+    setFormAccountTitle('');
+    setFormAccountIban('');
+    setFormBranchCode('');
+    setFormIsDefault(false);
+  };
+
+  const handleDeleteBankAccount = async (id) => {
+    if (!confirm('Are you sure you want to remove this bank account?')) return;
+    let updatedList = bankAccounts.filter((a) => a.id !== id);
+    if (updatedList.length > 0 && !updatedList.some((a) => a.isDefault)) {
+      updatedList[0].isDefault = true;
+    }
+    const defaultAcc = updatedList.find((a) => a.isDefault) || null;
+
+    await updateSettings({
+      ...state.settings,
+      bankAccounts: updatedList,
+      bankDetails: defaultAcc ? {
+        bankName: defaultAcc.bankName,
+        accountTitle: defaultAcc.accountTitle,
+        accountIban: defaultAcc.accountIban,
+        branchCode: defaultAcc.branchCode
+      } : {},
+      proposalData: {
+        ...(state.settings?.proposalData || {}),
+        bankName: defaultAcc?.bankName || '',
+        accountTitle: defaultAcc?.accountTitle || '',
+        accountIban: defaultAcc?.accountIban || '',
+        branchCode: defaultAcc?.branchCode || ''
+      }
+    });
+
+    setBankAccounts(updatedList);
+    if (editingBankId === id) handleCancelBankEdit();
+    showToast('🗑️ Bank account removed.');
+  };
+
+  const handleSetDefaultBank = async (id) => {
+    const updatedList = bankAccounts.map((a) => ({
+      ...a,
+      isDefault: a.id === id
+    }));
+    const defaultAcc = updatedList.find((a) => a.isDefault);
+
+    await updateSettings({
+      ...state.settings,
+      bankAccounts: updatedList,
+      bankDetails: defaultAcc ? {
+        bankName: defaultAcc.bankName,
+        accountTitle: defaultAcc.accountTitle,
+        accountIban: defaultAcc.accountIban,
+        branchCode: defaultAcc.branchCode
+      } : {},
+      proposalData: {
+        ...(state.settings?.proposalData || {}),
+        bankName: defaultAcc?.bankName || '',
+        accountTitle: defaultAcc?.accountTitle || '',
+        accountIban: defaultAcc?.accountIban || '',
+        branchCode: defaultAcc?.branchCode || ''
+      }
+    });
+
+    setBankAccounts(updatedList);
+    showToast(`⭐ ${defaultAcc?.bankName} set as Primary Default Account.`);
   };
 
   // Service Catalog Actions
@@ -451,6 +600,15 @@ export default function SettingsPage() {
             </>
           )}
 
+          {activeTab === 'banking' && (
+            <div>
+              <h2>
+                <span>Online Banking &amp; Payment Accounts</span>
+              </h2>
+              <p>Manage multi-bank accounts, digital wallets (Meezan, HBL, EasyPaisa, JazzCash) for invoice collections and client payment processing.</p>
+            </div>
+          )}
+
           {activeTab === 'proposal' && (
             <>
               <h2>
@@ -573,124 +731,6 @@ export default function SettingsPage() {
             </form>
           </div>
 
-          {/* Left Column Card 2: Online Banking & Payment Details */}
-          <div className="settings-card" style={{ marginTop: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <div>
-                <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="3" y1="21" x2="21" y2="21" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                    <polyline points="5 6 12 3 19 6" />
-                    <line x1="4" y1="10" x2="4" y2="21" />
-                    <line x1="20" y1="10" x2="20" y2="21" />
-                    <line x1="8" y1="14" x2="8" y2="17" />
-                    <line x1="12" y1="14" x2="12" y2="17" />
-                    <line x1="16" y1="14" x2="16" y2="17" />
-                  </svg>
-                  <span>Online Banking &amp; Payment Accounts</span>
-                </h4>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
-                  Configure your receiving bank accounts for Full &amp; Partial payment collection.
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleSaveBankSettings} className="settings-form-grid enter-flow" autoComplete="off">
-              <div>
-                <label>
-                  Bank / Wallet Name <span className="req">*</span>
-                </label>
-                <input
-                  id="sBankName"
-                  className="input"
-                  placeholder="e.g. Meezan Bank, HBL, EasyPaisa, JazzCash"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div>
-                <label>
-                  Account Title <span className="req">*</span>
-                </label>
-                <input
-                  id="sAccTitle"
-                  className="input"
-                  placeholder="e.g. Warsi Business Solutions"
-                  value={accountTitle}
-                  onChange={(e) => setAccountTitle(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="full">
-                <label>
-                  Account Number / IBAN <span className="req">*</span>
-                </label>
-                <input
-                  id="sAccIban"
-                  className="input"
-                  placeholder="e.g. PK36MEZN00012345678901 or 03218246707"
-                  value={accountIban}
-                  onChange={(e) => setAccountIban(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="full">
-                <label>Branch Code / Remarks (Optional)</label>
-                <input
-                  id="sBranchCode"
-                  className="input"
-                  placeholder="e.g. Clifton Branch (0102) / Send screenshot on WhatsApp"
-                  value={branchCode}
-                  onChange={(e) => setBranchCode(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              {/* Verified Banking Preview Card */}
-              {(bankName || accountTitle || accountIban) && (
-                <div className="full" style={{
-                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                  color: '#ffffff',
-                  padding: '16px 18px',
-                  borderRadius: '12px',
-                  border: '1px solid #334155',
-                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.12)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8', fontWeight: 600 }}>
-                      Verified Online Banking Account
-                    </span>
-                    <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#38bdf8' }}>
-                      {bankName || 'Bank'}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.4px' }}>
-                    {accountTitle || 'Account Title'}
-                  </div>
-                  <div style={{ fontSize: '13.5px', fontFamily: 'monospace', color: '#cbd5e1', marginTop: '4px' }}>
-                    {accountIban || 'Account / IBAN Number'}
-                  </div>
-                  {branchCode && (
-                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
-                      {branchCode}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="full settings-save">
-                <Button variant="primary" type="submit">
-                  Save Banking Details
-                </Button>
-              </div>
-            </form>
-          </div>
-
           {/* Right Column: WhatsApp Delivery + Data & Backup */}
           <div className="settings-right-stack">
             {/* WhatsApp Scanner Card */}
@@ -748,6 +788,308 @@ export default function SettingsPage() {
                   Clear All Data (Reset)
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODULE: Online Banking & Payment Accounts (Multi-Bank Accounts)
+         ========================================================================= */}
+      {activeTab === 'banking' && (
+        <div className="settings-layout">
+          {/* Left Column: Add / Edit Bank Form */}
+          <div className="settings-card">
+            <h4>{editingBankId ? 'Edit Bank Account' : 'Add Bank / Payment Account'}</h4>
+            <p style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '14px' }}>
+              Add your official receiving banks or digital mobile wallets.
+            </p>
+
+            {/* Quick Presets */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                Quick Presets
+              </label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {['Meezan Bank', 'HBL', 'EasyPaisa', 'JazzCash', 'Bank Alfalah', 'UBL'].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setFormBankName(preset)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11.5px',
+                      borderRadius: '16px',
+                      border: formBankName === preset ? '1px solid #0284c7' : '1px solid #e2e8f0',
+                      background: formBankName === preset ? '#e0f2fe' : '#f8fafc',
+                      color: formBankName === preset ? '#0369a1' : '#475569',
+                      cursor: 'pointer',
+                      fontWeight: formBankName === preset ? 700 : 500
+                    }}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveBankAccount} className="settings-form-grid enter-flow" autoComplete="off">
+              <div>
+                <label>
+                  Bank / Wallet Name <span className="req">*</span>
+                </label>
+                <input
+                  id="bBankName"
+                  className="input"
+                  placeholder="e.g. Meezan Bank, HBL, EasyPaisa"
+                  value={formBankName}
+                  onChange={(e) => setFormBankName(e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+
+              <div>
+                <label>
+                  Account Title <span className="req">*</span>
+                </label>
+                <input
+                  id="bAccTitle"
+                  className="input"
+                  placeholder="e.g. Warsi Business Solutions"
+                  value={formAccountTitle}
+                  onChange={(e) => setFormAccountTitle(e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+
+              <div className="full">
+                <label>
+                  Account Number / IBAN <span className="req">*</span>
+                </label>
+                <input
+                  id="bAccIban"
+                  className="input"
+                  placeholder="e.g. PK346MEZN88904 or 03218246707"
+                  value={formAccountIban}
+                  onChange={(e) => setFormAccountIban(e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+
+              <div className="full">
+                <label>Branch Code / Remarks (Optional)</label>
+                <input
+                  id="bBranch"
+                  className="input"
+                  placeholder="e.g. Clifton Branch (0102) / Send screenshot on WhatsApp"
+                  value={formBranchCode}
+                  onChange={(e) => setFormBranchCode(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="full" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  id="bIsDefault"
+                  checked={formIsDefault}
+                  onChange={(e) => setFormIsDefault(e.target.checked)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <label htmlFor="bIsDefault" style={{ fontSize: '13px', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+                  Set as Primary / Default Account for Invoices &amp; Proposals
+                </label>
+              </div>
+
+              {/* Live Preview Card */}
+              {(formBankName || formAccountTitle || formAccountIban) && (
+                <div className="full" style={{
+                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  color: '#ffffff',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #334155',
+                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
+                  marginTop: '6px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '1px', color: '#94a3b8', fontWeight: 600 }}>
+                      Live Bank Card Preview
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#38bdf8' }}>
+                      {formBankName || 'Bank Name'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '14.5px', fontWeight: 600 }}>
+                    {formAccountTitle || 'Account Title'}
+                  </div>
+                  <div style={{ fontSize: '13px', fontFamily: 'monospace', color: '#cbd5e1', marginTop: '4px' }}>
+                    {formAccountIban || 'Account / IBAN'}
+                  </div>
+                </div>
+              )}
+
+              <div className="full settings-save" style={{ display: 'flex', gap: '8px' }}>
+                <Button variant="primary" type="submit">
+                  {editingBankId ? 'Update Bank Account' : '+ Add Bank Account'}
+                </Button>
+                {editingBankId && (
+                  <Button variant="light" type="button" onClick={handleCancelBankEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Right Column: List of Configured Bank Accounts */}
+          <div className="settings-right-stack">
+            <div className="settings-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <h4 style={{ margin: 0 }}>Configured Bank Accounts</h4>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    Accounts available during payment settlement
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '12px',
+                  background: '#e0f2fe',
+                  color: '#0369a1',
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  borderRadius: '12px'
+                }}>
+                  {bankAccounts.length} {bankAccounts.length === 1 ? 'Account' : 'Accounts'}
+                </span>
+              </div>
+
+              {bankAccounts.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '30px 16px',
+                  background: '#f8fafc',
+                  borderRadius: '10px',
+                  border: '1px dashed #cbd5e1'
+                }}>
+                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>🏦</div>
+                  <div style={{ fontWeight: 600, color: '#475569', fontSize: '14px' }}>No bank accounts added yet</div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                    Use the form on the left to add your first bank account.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {bankAccounts.map((acc) => {
+                    const isDefault = Boolean(acc.isDefault);
+                    return (
+                      <div
+                        key={acc.id}
+                        style={{
+                          background: isDefault ? '#f0f9ff' : '#ffffff',
+                          border: isDefault ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '14px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '18px' }}>🏦</span>
+                            <div>
+                              <strong style={{ fontSize: '14px', color: '#0f172a' }}>{acc.bankName}</strong>
+                              {isDefault && (
+                                <span style={{
+                                  marginLeft: '8px',
+                                  fontSize: '10.5px',
+                                  fontWeight: 700,
+                                  background: '#0284c7',
+                                  color: '#ffffff',
+                                  padding: '2px 7px',
+                                  borderRadius: '10px',
+                                  letterSpacing: '0.4px'
+                                }}>
+                                  PRIMARY DEFAULT
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleEditBankAccount(acc)}
+                              style={{
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                color: '#0284c7',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBankAccount(acc.id)}
+                              style={{
+                                border: '1px solid #fecaca',
+                                background: '#ffffff',
+                                color: '#dc2626',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '12.5px', color: '#334155', marginTop: '6px' }}>
+                          <span style={{ color: '#64748b' }}>Account Title:</span> <strong>{acc.accountTitle}</strong>
+                        </div>
+                        <div style={{ fontSize: '12.5px', color: '#334155', marginTop: '2px' }}>
+                          <span style={{ color: '#64748b' }}>Account / IBAN:</span> <strong style={{ fontFamily: 'monospace', color: '#0284c7' }}>{acc.accountIban}</strong>
+                        </div>
+                        {acc.branchCode && (
+                          <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '3px' }}>
+                            <em>{acc.branchCode}</em>
+                          </div>
+                        )}
+
+                        {!isDefault && (
+                          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleSetDefaultBank(acc.id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#0284c7',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                padding: 0
+                              }}
+                            >
+                              ⭐ Set as Primary Default Account
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

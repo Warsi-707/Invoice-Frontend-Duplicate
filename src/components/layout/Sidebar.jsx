@@ -260,6 +260,14 @@ export default function Sidebar() {
 
               <button
                 type="button"
+                className={`nav-sub-item ${currentPage === 'settings' && settingsTab === 'banking' ? 'active' : ''}`}
+                onClick={() => handleSubTabClick('banking')}
+              >
+                <span>Online Banking</span>
+              </button>
+
+              <button
+                type="button"
                 className={`nav-sub-item ${currentPage === 'settings' && settingsTab === 'proposal' ? 'active' : ''}`}
                 onClick={() => handleSubTabClick('proposal')}
               >

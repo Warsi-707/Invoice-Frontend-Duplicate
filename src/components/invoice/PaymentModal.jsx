@@ -19,13 +19,35 @@ export default function PaymentModal({
   const [trxRef, setTrxRef] = useState('');
   const [paymentDate, setPaymentDate] = useState(today());
 
-  // Extract Bank Details from Settings
-  const bank = state.settings?.bankDetails || {};
-  const prop = state.settings?.proposalData || {};
-  const activeBankName = bank.bankName || prop.bankName || '';
-  const activeAccountTitle = bank.accountTitle || prop.accountTitle || '';
-  const activeAccountIban = bank.accountIban || prop.accountIban || '';
-  const activeBranch = bank.branchCode || prop.branchCode || '';
+  // Extract Bank Accounts from Settings
+  const bankAccounts = Array.isArray(state.settings?.bankAccounts) && state.settings.bankAccounts.length > 0
+    ? state.settings.bankAccounts
+    : (state.settings?.bankDetails?.bankName || state.settings?.proposalData?.bankName)
+      ? [{
+          id: 'default-1',
+          bankName: state.settings?.bankDetails?.bankName || state.settings?.proposalData?.bankName || 'Meezan Bank',
+          accountTitle: state.settings?.bankDetails?.accountTitle || state.settings?.proposalData?.accountTitle || 'iSysware Software Solution',
+          accountIban: state.settings?.bankDetails?.accountIban || state.settings?.proposalData?.accountIban || 'PK346MEZN88904',
+          branchCode: state.settings?.bankDetails?.branchCode || state.settings?.proposalData?.branchCode || '',
+          isDefault: true
+        }]
+      : [];
+
+  const defaultAccount = bankAccounts.find(b => b.isDefault) || bankAccounts[0] || null;
+  const [selectedBankId, setSelectedBankId] = useState(defaultAccount?.id || '');
+
+  useEffect(() => {
+    if (isOpen) {
+      const def = bankAccounts.find(b => b.isDefault) || bankAccounts[0] || null;
+      if (def) setSelectedBankId(def.id);
+    }
+  }, [isOpen, state.settings?.bankAccounts]);
+
+  const activeSelectedBank = bankAccounts.find(b => b.id === selectedBankId) || defaultAccount || {};
+  const activeBankName = activeSelectedBank.bankName || '';
+  const activeAccountTitle = activeSelectedBank.accountTitle || '';
+  const activeAccountIban = activeSelectedBank.accountIban || '';
+  const activeBranch = activeSelectedBank.branchCode || '';
 
   useEffect(() => {
     if (isOpen && invoice) {
@@ -170,7 +192,7 @@ export default function PaymentModal({
             />
           </div>
 
-          {/* Dedicated Online Bank Transfer Details Box */}
+          {/* Dedicated Online Bank Transfer Details Box with Multi-Bank Selection */}
           {method === 'Online' && (
             <div style={{
               gridColumn: '1 / -1',
@@ -182,7 +204,7 @@ export default function PaymentModal({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0369a1', fontWeight: 700, fontSize: '13px' }}>
-                  <span>🏦</span> Deposit Bank Account (From Settings)
+                  <span>🏦</span> Deposit Bank Account
                 </div>
                 {activeBankName && (
                   <span style={{ fontSize: '11px', background: '#bae6fd', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
@@ -190,6 +212,27 @@ export default function PaymentModal({
                   </span>
                 )}
               </div>
+
+              {/* Bank selector dropdown when multiple accounts exist */}
+              {bankAccounts.length > 1 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ fontSize: '11.5px', color: '#0369a1', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Select Receiving Bank Account
+                  </label>
+                  <select
+                    className="select"
+                    value={selectedBankId}
+                    onChange={(e) => setSelectedBankId(e.target.value)}
+                    style={{ background: '#ffffff', fontWeight: 600 }}
+                  >
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.bankName} — {b.accountTitle} ({b.accountIban}) {b.isDefault ? '★ [Default]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {activeBankName || activeAccountIban ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', fontSize: '12.5px', background: '#ffffff', padding: '10px', borderRadius: '8px', border: '1px solid #e0f2fe' }}>
@@ -213,7 +256,7 @@ export default function PaymentModal({
                 </div>
               ) : (
                 <div style={{ fontSize: '12px', color: '#0284c7', background: '#e0f2fe', padding: '8px 12px', borderRadius: '6px' }}>
-                  💡 Tip: Aap <strong>Settings &gt; Organization &gt; Online Banking</strong> mein apna Bank Name aur IBAN save kar lein, toh woh hamesha yahan auto-display hoga.
+                  💡 Tip: Aap <strong>Settings &gt; Online Banking</strong> mein apne Bank Accounts add kar sakte hain.
                 </div>
               )}
 
