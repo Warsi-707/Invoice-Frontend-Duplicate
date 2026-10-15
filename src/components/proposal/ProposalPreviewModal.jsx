@@ -114,7 +114,7 @@ export default function ProposalPreviewModal({
       onClose={onClose}
       title="Commercial Proposal & Letterhead Preview"
       headerExtra={headerExtra}
-      maxWidth="880px"
+      maxWidth="920px"
     >
       <div className="proposal-preview-a4">
         {/* Letterhead Top Header */}
@@ -162,105 +162,109 @@ export default function ProposalPreviewModal({
         {/* Deliverables Table */}
         <div className="prop-section">
           <div className="prop-section-title">{delivSecNum}. Deliverables & Commercial Pricing</div>
-          <table className="prop-table">
-            <thead>
-              <tr>
-                <th style={{ width: '32px', textAlign: 'center' }}>#</th>
-                <th style={{ textAlign: 'left' }}>Deliverable / Service</th>
-                <th style={{ width: '55px', textAlign: 'center' }}>Qty</th>
-                <th style={{ width: '110px', textAlign: 'right' }}>Unit Price</th>
-                <th style={{ width: '90px', textAlign: 'right' }}>Discount</th>
-                <th style={{ width: '65px', textAlign: 'center' }}>Tax</th>
-                <th style={{ width: '125px', textAlign: 'right' }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it, idx) => {
-                const gross = Number(it.qty || 1) * Number(it.price || 0);
-                const disc = Number(it.discount || 0);
-                const taxP = Number(it.taxPct || 0);
-                const taxBase = Math.max(0, gross - disc);
-                const lineTax = (taxBase * taxP) / 100;
-                const lineTot = taxBase + lineTax;
+          <div className="prop-table-responsive">
+            <table className="prop-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '28px', textAlign: 'center' }}>#</th>
+                  <th style={{ textAlign: 'left' }}>Deliverable / Service</th>
+                  <th style={{ width: '48px', textAlign: 'center' }}>Qty</th>
+                  <th style={{ width: '95px', textAlign: 'right', whiteSpace: 'nowrap' }}>Unit Price</th>
+                  <th style={{ width: '80px', textAlign: 'right', whiteSpace: 'nowrap' }}>Discount</th>
+                  <th style={{ width: '55px', textAlign: 'center', whiteSpace: 'nowrap' }}>Tax</th>
+                  <th style={{ width: '110px', textAlign: 'right', whiteSpace: 'nowrap' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, idx) => {
+                  const gross = Number(it.qty || 1) * Number(it.price || 0);
+                  const disc = Number(it.discount || 0);
+                  const taxP = Number(it.taxPct || 0);
+                  const taxBase = Math.max(0, gross - disc);
+                  const lineTax = (taxBase * taxP) / 100;
+                  const lineTot = taxBase + lineTax;
 
-                return (
-                  <tr key={it.id || idx}>
-                    <td style={{ textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
-                    <td>
-                      <strong>{it.name || 'Deliverable'}</strong>
-                      {it.desc && <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>{it.desc}</div>}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>{it.qty || 1}</td>
-                    <td style={{ textAlign: 'right' }}>{money(it.price || 0, cur)}</td>
-                    <td style={{ textAlign: 'right', color: disc > 0 ? '#dc2626' : '#64748b' }}>
-                      ${disc > 0 ? `- ${money(disc, cur)}` : '—'}
-                    </td>
-                    <td style={{ textAlign: 'center', color: taxP > 0 ? '#0369a1' : '#64748b' }}>
-                      ${taxP > 0 ? `${taxP}%` : '—'}
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: '750' }}>
-                      {money(lineTot, cur)}
-                    </td>
+                  return (
+                    <tr key={it.id || idx}>
+                      <td style={{ textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                      <td>
+                        <strong>{it.name || 'Deliverable'}</strong>
+                        {it.desc && <div style={{ fontSize: '10.5px', color: '#64748b', marginTop: '2px' }}>{it.desc}</div>}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>{it.qty || 1}</td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{money(it.price || 0, cur)}</td>
+                      <td style={{ textAlign: 'right', color: disc > 0 ? '#dc2626' : '#64748b', whiteSpace: 'nowrap' }}>
+                        {disc > 0 ? `- ${money(disc, cur)}` : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center', color: taxP > 0 ? '#0369a1' : '#64748b', whiteSpace: 'nowrap' }}>
+                        {taxP > 0 ? `${taxP}%` : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: '750', whiteSpace: 'nowrap' }}>
+                        {money(lineTot, cur)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                {(totalDiscount > 0 || totalTaxAmount > 0) && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'right', fontWeight: '750', fontSize: '11px', background: '#f8fafc', color: '#475569' }}>Subtotal:</td>
+                    <td style={{ textAlign: 'right', fontWeight: '750', fontSize: '11.5px', background: '#f8fafc', whiteSpace: 'nowrap' }}>{money(subtotal, cur)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              {(totalDiscount > 0 || totalTaxAmount > 0) && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'right', fontWeight: '750', fontSize: '11px', background: '#f8fafc', color: '#475569' }}>Subtotal:</td>
-                  <td style={{ textAlign: 'right', fontWeight: '750', fontSize: '11.5px', background: '#f8fafc' }}>{money(subtotal, cur)}</td>
+                )}
+                {totalDiscount > 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'right', fontSize: '11px', color: '#dc2626', background: '#f8fafc' }}>Total Discount:</td>
+                    <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', color: '#dc2626', background: '#f8fafc', whiteSpace: 'nowrap' }}>- {money(totalDiscount, cur)}</td>
+                  </tr>
+                )}
+                {totalTaxAmount > 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'right', fontSize: '11px', color: '#0369a1', background: '#f8fafc' }}>Total Tax:</td>
+                    <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', color: '#0369a1', background: '#f8fafc', whiteSpace: 'nowrap' }}>+ {money(totalTaxAmount, cur)}</td>
+                  </tr>
+                )}
+                <tr style={{ borderTop: '2px solid #0b4b8f' }}>
+                  <td colSpan={6} style={{ textAlign: 'right', fontWeight: '800', fontSize: '12px', color: '#0b4b8f', background: '#edf4fe', textTransform: 'uppercase' }}>TOTAL:</td>
+                  <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '12.5px', color: '#0b4b8f', background: '#edf4fe', whiteSpace: 'nowrap' }}>{money(grandTotal, cur)}</td>
                 </tr>
-              )}
-              {totalDiscount > 0 && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'right', fontSize: '11px', color: '#dc2626', background: '#f8fafc' }}>Total Discount:</td>
-                  <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', color: '#dc2626', background: '#f8fafc' }}>- {money(totalDiscount, cur)}</td>
-                </tr>
-              )}
-              {totalTaxAmount > 0 && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'right', fontSize: '11px', color: '#0369a1', background: '#f8fafc' }}>Total Tax:</td>
-                  <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '11px', color: '#0369a1', background: '#f8fafc' }}>+ {money(totalTaxAmount, cur)}</td>
-                </tr>
-              )}
-              <tr style={{ borderTop: '2px solid #0b4b8f' }}>
-                <td colSpan={6} style={{ textAlign: 'right', fontWeight: '800', fontSize: '12px', color: '#0b4b8f', background: '#edf4fe', textTransform: 'uppercase' }}>TOTAL:</td>
-                <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '12.5px', color: '#0b4b8f', background: '#edf4fe' }}>{money(grandTotal, cur)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </div>
 
         {/* Payment Milestones (If present) */}
         {hasMilestones && (
           <div className="prop-section">
             <div className="prop-section-title">{milestoneSecNum}. Payment Milestones & Billing Schedule</div>
-            <table className="prop-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '36px', textAlign: 'center' }}>#</th>
-                  <th>Milestone / Deliverable</th>
-                  <th style={{ width: '70px', textAlign: 'center' }}>%</th>
-                  <th style={{ width: '140px', textAlign: 'right' }}>Amount ({cur})</th>
-                  <th style={{ width: '220px' }}>Due Condition</th>
-                </tr>
-              </thead>
-              <tbody>
-                {proposal.milestones.map((ms, idx) => {
-                  const msAmt = grandTotal > 0 ? (Number(ms.pct || 0) / 100) * grandTotal : 0;
-                  return (
-                    <tr key={ms.id || idx}>
-                      <td style={{ textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
-                      <td><strong>{ms.name || `Milestone ${idx + 1}`}</strong></td>
-                      <td style={{ textAlign: 'center', fontWeight: '700', color: '#0b4b8f' }}>{ms.pct || 0}%</td>
-                      <td style={{ textAlign: 'right', fontWeight: '800', color: '#065f46' }}>{money(msAmt, cur)}</td>
-                      <td style={{ fontSize: '10.5px', color: '#475569' }}>{ms.dueCondition || '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="prop-table-responsive">
+              <table className="prop-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '28px', textAlign: 'center' }}>#</th>
+                    <th>Milestone / Deliverable</th>
+                    <th style={{ width: '55px', textAlign: 'center' }}>%</th>
+                    <th style={{ width: '115px', textAlign: 'right', whiteSpace: 'nowrap' }}>Amount ({cur})</th>
+                    <th style={{ width: '140px' }}>Due Condition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {proposal.milestones.map((ms, idx) => {
+                    const msAmt = grandTotal > 0 ? (Number(ms.pct || 0) / 100) * grandTotal : 0;
+                    return (
+                      <tr key={ms.id || idx}>
+                        <td style={{ textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                        <td><strong>{ms.name || `Milestone ${idx + 1}`}</strong></td>
+                        <td style={{ textAlign: 'center', fontWeight: '700', color: '#0b4b8f' }}>{ms.pct || 0}%</td>
+                        <td style={{ textAlign: 'right', fontWeight: '800', color: '#065f46', whiteSpace: 'nowrap' }}>{money(msAmt, cur)}</td>
+                        <td style={{ fontSize: '10.5px', color: '#475569' }}>{ms.dueCondition || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

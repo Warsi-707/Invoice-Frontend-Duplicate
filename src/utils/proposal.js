@@ -296,13 +296,13 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
         <table class="prop-table">
           <thead>
             <tr>
-              <th style="width: 32px; text-align: center;">#</th>
+              <th style="width: 28px; text-align: center;">#</th>
               <th style="text-align: left;">Deliverable / Service</th>
-              <th style="width: 55px; text-align: center;">Qty</th>
-              <th style="width: 110px; text-align: right;">Unit Price</th>
-              <th style="width: 90px; text-align: right;">Discount</th>
-              <th style="width: 65px; text-align: center;">Tax</th>
-              <th style="width: 125px; text-align: right;">Total</th>
+              <th style="width: 48px; text-align: center;">Qty</th>
+              <th style="width: 95px; text-align: right; white-space: nowrap;">Unit Price</th>
+              <th style="width: 80px; text-align: right; white-space: nowrap;">Discount</th>
+              <th style="width: 55px; text-align: center; white-space: nowrap;">Tax</th>
+              <th style="width: 110px; text-align: right; white-space: nowrap;">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -370,11 +370,11 @@ export function generateProposalHtml(proposal = {}, business = {}, customer = {}
           <table class="prop-table">
             <thead>
               <tr>
-                <th style="width: 36px; text-align: center;">#</th>
+                <th style="width: 28px; text-align: center;">#</th>
                 <th>Milestone / Deliverable</th>
-                <th style="width: 70px; text-align: center;">%</th>
-                <th style="width: 140px; text-align: right;">Amount (${esc(cur)})</th>
-                <th style="width: 220px;">Due Condition</th>
+                <th style="width: 55px; text-align: center;">%</th>
+                <th style="width: 115px; text-align: right; white-space: nowrap;">Amount (${esc(cur)})</th>
+                <th style="width: 140px;">Due Condition</th>
               </tr>
             </thead>
             <tbody>
