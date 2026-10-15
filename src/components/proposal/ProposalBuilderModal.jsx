@@ -330,7 +330,7 @@ export default function ProposalBuilderModal({
   return (
     <>
       <Modal
-        isOpen={isOpen}
+        isOpen={isOpen && !isPreviewOpen}
         onClose={onClose}
         title={`Commercial Proposal: ${customer.name || 'Client'}`}
         headerExtra={headerExtra}
